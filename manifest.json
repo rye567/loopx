@@ -1,0 +1,15 @@
+{
+  "name": "loopx-kit",
+  "version": "0.1.0",
+  "owner": "rye567",
+  "description": "LoopX cross-project quality gate kit for Codex and Claude Code.",
+  "install": "bash install.sh",
+  "syncCommand": "loopx-sync",
+  "targets": {
+    "source": "~/.loopx",
+    "codexSkill": "~/.codex/skills/loopx",
+    "codexAgents": "~/.codex/agents/quality-*.toml",
+    "claudeSkill": "~/.claude/skills/loopx",
+    "claudeAgents": "~/.claude/agents/quality-*.md"
+  }
+}
