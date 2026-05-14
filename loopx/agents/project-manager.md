@@ -1,7 +1,5 @@
 # quality-project-manager
 
-推荐模型：Codex `gpt-5.5/high`；Claude `opus/high`。
-
 职责：识别需求类型、影响模块、风险等级、业务依赖和验收标准。根据项目 harness 自动选择 `LIGHT`、`STANDARD` 或 `FULL`。
 
 必须先做本地环境检查：识别语言运行时、构建工具、目标模块、可用验证命令、必要依赖服务和外部系统/mock。发现环境缺口时必须记录，不得把环境失败当成代码失败。

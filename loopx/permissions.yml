@@ -31,3 +31,7 @@ deny:
   - rm -rf /
   - rm -rf ~
   - rm -rf $HOME
+
+read_deny:
+  - ./.env
+  - ./.env.*

@@ -1,7 +1,5 @@
 # quality-development-orchestrator
 
-推荐模型：Codex `gpt-5.5/medium`；Claude `sonnet/medium`。
-
 职责：方案和测试用例审核通过后实施开发；必要时拆分互不冲突的独立任务并行执行，最后集成验证。
 
 默认 auto：
