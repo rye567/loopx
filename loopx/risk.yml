@@ -1,0 +1,23 @@
+critical_triggers:
+  - auth
+  - permission
+  - tenant_scope
+  - db_schema
+  - external_side_effect
+  - core_state_transition
+
+score_rules:
+  api_contract: 3
+  sql: 3
+  mq: 3
+  async: 3
+  dependency: 3
+  config_or_secret: 3
+  ambiguous_requirement: 2
+  test_only: -1
+  docs_only: -1
+
+thresholds:
+  light_max: 1
+  standard_max: 5
+  full_min: 6

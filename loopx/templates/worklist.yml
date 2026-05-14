@@ -1,0 +1,19 @@
+run:
+  id:
+  requirement:
+  mode:
+  status:
+
+items:
+  - id: W001
+    title:
+    type:
+    risk_tags: []
+    owner_agent:
+    read_scope: []
+    write_scope: []
+    dependencies: []
+    validation: []
+    status:
+    evidence: []
+    notes:

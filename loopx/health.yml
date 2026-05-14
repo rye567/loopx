@@ -1,0 +1,20 @@
+health:
+  core_required: true
+  allow_auto_install: false
+  missing_tool_policy:
+    optional: SKIPPED
+    ci_backed: CI_REQUIRED
+    required: BLOCKED
+
+  core_checks:
+    - stage_artifacts_complete
+    - worklist_items_resolved
+    - validation_evidence_exists
+    - cleanup_verified
+    - ci_gap_declared
+
+  result_status:
+    pass: PASS
+    pass_with_warnings: PASS_WITH_WARNINGS
+    local_incomplete: LOCAL_INCOMPLETE_CI_REQUIRED
+    blocked: BLOCKED

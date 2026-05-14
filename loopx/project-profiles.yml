@@ -1,0 +1,21 @@
+profiles:
+  java-maven:
+    detect:
+      - pom.xml
+    commands:
+      compile: mvn compile
+      test: mvn test
+      targeted_test: mvn -pl <module-path> -am -Dtest=<TestClass> -DfailIfNoTests=false test
+
+  node-pnpm:
+    detect:
+      - pnpm-lock.yaml
+    commands:
+      install_check: pnpm install --frozen-lockfile
+      test: pnpm test
+
+  python-pytest:
+    detect:
+      - pyproject.toml
+    commands:
+      test: pytest

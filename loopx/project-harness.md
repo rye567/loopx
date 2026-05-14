@@ -10,3 +10,21 @@
 2. 项目分配阶段必须输出模块发现结果和不确定点。
 3. 没有项目专属 reviewer 时，使用全局 `quality-*` agent 继续执行，并记录降级原因。
 4. 测试执行仍必须覆盖业务/API 数据准备、执行入口、断言、清理动作和清理验证。
+
+项目发现结果建议使用以下结构：
+
+```yaml
+project_discovery:
+  modules: []
+  entrypoints: []
+  api_contracts: []
+  db_schema: []
+  async_jobs: []
+  message_topics: []
+  config_files: []
+  secret_sources: []
+  test_locations: []
+  validation_commands: []
+  external_dependencies: []
+  unknowns: []
+```

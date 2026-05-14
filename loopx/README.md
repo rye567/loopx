@@ -7,7 +7,7 @@
 ## 日常使用
 
 1. 任意项目运行：`loopx-sync project` 或 `loopx-sync all`。
-2. 通用流程改 `~/.loopx/workflow.md`、`~/.loopx/agents/`、`~/.loopx/permissions.yml` 或 `~/.loopx/templates/`。
+2. 通用流程改 `~/.loopx/workflow.md`、`~/.loopx/agents/`、`~/.loopx/permissions.yml`、`~/.loopx/health.yml`、`~/.loopx/risk.yml`、`~/.loopx/project-profiles.yml` 或 `~/.loopx/templates/`。
 3. 项目专属规则放在当前项目的 `.codex/loopx-project/`。
 4. Claude Code 使用 `/loopx 处理需求：...`；Codex 使用 `$loopx 处理需求：...`。
 

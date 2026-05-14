@@ -15,15 +15,100 @@ CLAUDE_HOME = HOME / ".claude"
 LOCAL_BIN = HOME / ".local" / "bin"
 
 AGENTS = [
-    ("quality-project-manager", "project-manager.md", "opus", "high", "项目分配：识别范围、模块、风险、依赖和验收标准。"),
-    ("quality-solution-designer", "solution-designer.md", "opus", "xhigh", "方案设计：给出方案、数据流、接口、兼容策略和影响范围。"),
-    ("quality-solution-reviewer", "solution-reviewer.md", "opus", "xhigh", "方案审核：审核需求匹配、项目规则、模块边界、风险和可测试性。"),
-    ("quality-test-designer", "test-designer.md", "opus", "high", "测试用例设计：设计业务/API 数据、断言、清理和清理验证。"),
-    ("quality-test-reviewer", "test-reviewer.md", "opus", "high", "测试用例审核：审核覆盖率、清理策略和残余风险。"),
-    ("quality-development-orchestrator", "development.md", "sonnet", "medium", "开发阶段：auto 修改代码、补测试并运行编译和定向测试。"),
-    ("quality-code-reviewer", "code-reviewer.md", "opus", "xhigh", "代码审查：审查 diff、回归、缺失测试、模块边界和安全风险。"),
-    ("quality-test-runner", "test-runner.md", "sonnet", "medium", "测试执行：按用例准备数据、执行、断言、清理并输出报告。"),
+    {
+        "name": "quality-project-manager",
+        "source_file": "project-manager.md",
+        "phase": "01-assignment",
+        "role": "discovery",
+        "claude_model": "opus",
+        "claude_effort": "high",
+        "codex_effort": "high",
+        "tools": "Read, Grep, Glob, Bash",
+        "description": "项目分配：识别范围、模块、风险、依赖和验收标准。",
+    },
+    {
+        "name": "quality-solution-designer",
+        "source_file": "solution-designer.md",
+        "phase": "02-solution",
+        "role": "design",
+        "claude_model": "opus",
+        "claude_effort": "xhigh",
+        "codex_effort": "xhigh",
+        "tools": "Read, Grep, Glob, Bash",
+        "description": "方案设计：给出方案、数据流、接口、兼容策略和影响范围。",
+    },
+    {
+        "name": "quality-solution-reviewer",
+        "source_file": "solution-reviewer.md",
+        "phase": "03-solution-review",
+        "role": "review",
+        "claude_model": "opus",
+        "claude_effort": "xhigh",
+        "codex_effort": "xhigh",
+        "tools": "Read, Grep, Glob, Bash",
+        "description": "方案审核：审核需求匹配、项目规则、模块边界、风险和可测试性。",
+    },
+    {
+        "name": "quality-test-designer",
+        "source_file": "test-designer.md",
+        "phase": "04-test-cases",
+        "role": "design",
+        "claude_model": "opus",
+        "claude_effort": "high",
+        "codex_effort": "high",
+        "tools": "Read, Grep, Glob, Bash",
+        "description": "测试用例设计：设计业务/API 数据、断言、清理和清理验证。",
+    },
+    {
+        "name": "quality-test-reviewer",
+        "source_file": "test-reviewer.md",
+        "phase": "05-test-review",
+        "role": "review",
+        "claude_model": "opus",
+        "claude_effort": "high",
+        "codex_effort": "high",
+        "tools": "Read, Grep, Glob, Bash",
+        "description": "测试用例审核：审核覆盖率、清理策略和残余风险。",
+    },
+    {
+        "name": "quality-development-orchestrator",
+        "source_file": "development.md",
+        "phase": "06-development-summary",
+        "role": "write",
+        "claude_model": "sonnet",
+        "claude_effort": "medium",
+        "codex_effort": "medium",
+        "tools": "Read, Grep, Glob, Edit, MultiEdit, Write, Bash, Task",
+        "description": "开发阶段：auto 修改代码、补测试并运行编译和定向测试。",
+    },
+    {
+        "name": "quality-code-reviewer",
+        "source_file": "code-reviewer.md",
+        "phase": "07-code-review",
+        "role": "review",
+        "claude_model": "opus",
+        "claude_effort": "xhigh",
+        "codex_effort": "xhigh",
+        "tools": "Read, Grep, Glob, Bash",
+        "description": "代码审查：审查 diff、回归、缺失测试、模块边界和安全风险。",
+    },
+    {
+        "name": "quality-test-runner",
+        "source_file": "test-runner.md",
+        "phase": "08-test-report",
+        "role": "verify",
+        "claude_model": "sonnet",
+        "claude_effort": "medium",
+        "codex_effort": "medium",
+        "tools": "Read, Grep, Glob, Edit, MultiEdit, Write, Bash",
+        "description": "测试执行：按用例准备数据、执行、断言、清理并输出报告。",
+    },
 ]
+
+LOOPX_GENERATED_MARKER = "请修改全局中立源 `~/.loopx` 后重新同步"
+MANAGED_SECTION_START = "<!-- BEGIN LOOPX MANAGED SECTION -->"
+MANAGED_SECTION_END = "<!-- END LOOPX MANAGED SECTION -->"
+CONFIG_FILES = ["health.yml", "risk.yml", "project-profiles.yml"]
 
 
 def source_label():
@@ -46,6 +131,45 @@ def read_project(rel):
     return ""
 
 
+def read_permissions():
+    data = {"allow": [], "ask": [], "deny": [], "read_deny": []}
+    current = None
+    for raw_line in read("permissions.yml").splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if not line.startswith(" ") and stripped.endswith(":"):
+            current = stripped[:-1]
+            continue
+        if current in data and stripped.startswith("- "):
+            data[current].append(stripped[2:].strip())
+    return data
+
+
+def command_pattern(command):
+    return [part if not (part.startswith("<") and part.endswith(">")) else "*" for part in command.split()]
+
+
+def claude_bash_pattern(command):
+    return " ".join(command_pattern(command))
+
+
+def codex_rule_block(command, decision):
+    words = ", ".join(toml_string(part) for part in command_pattern(command))
+    labels = {
+        "allow": "允许自动运行该安全验证命令。",
+        "prompt": "该命令需要用户确认后才能执行。",
+        "forbidden": "该命令风险较高，LoopX 默认禁止执行。",
+    }
+    return f'''prefix_rule(
+    pattern = [{words}],
+    decision = "{decision}",
+    justification = "{labels[decision]}",
+)
+'''
+
+
 def write(root, rel, text):
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,16 +177,56 @@ def write(root, rel, text):
     print(f"write {path}")
 
 
+def replace_managed_section(existing, section):
+    start = existing.find(MANAGED_SECTION_START)
+    end = existing.find(MANAGED_SECTION_END)
+    if start == -1 or end == -1 or end < start:
+        return existing.rstrip() + "\n\n" + section
+    end += len(MANAGED_SECTION_END)
+    return existing[:start].rstrip() + "\n\n" + section + existing[end:].rstrip() + "\n"
+
+
+def write_project_entry(root, rel, text):
+    path = root / rel
+    section = "\n".join([
+        MANAGED_SECTION_START,
+        text.rstrip(),
+        MANAGED_SECTION_END,
+    ])
+    if path.exists():
+        existing = path.read_text(encoding="utf-8")
+        if MANAGED_SECTION_START in existing and MANAGED_SECTION_END in existing:
+            text = replace_managed_section(existing, section)
+        elif LOOPX_GENERATED_MARKER not in existing:
+            text = replace_managed_section(existing, section)
+    write(root, rel, text)
+
+
 def copy_templates(root, rel):
     target = root / rel
     target.mkdir(parents=True, exist_ok=True)
-    for template in sorted((SOURCE / "templates").glob("*.md")):
-        shutil.copy2(template, target / template.name)
-        print(f"copy {target / template.name}")
+    for template in sorted((SOURCE / "templates").iterdir()):
+        if template.is_file():
+            shutil.copy2(template, target / template.name)
+            print(f"copy {target / template.name}")
+
+
+def copy_configs(root, rel):
+    target = root / rel
+    target.mkdir(parents=True, exist_ok=True)
+    for name in CONFIG_FILES:
+        source = SOURCE / name
+        if source.exists():
+            shutil.copy2(source, target / source.name)
+            print(f"copy {target / source.name}")
 
 
 def generated_notice():
     return f"本文件由 `{source_label()}` 生成；请修改全局中立源 `~/.loopx` 后重新同步。\n"
+
+
+def toml_string(value):
+    return json.dumps(value, ensure_ascii=False)
 
 
 def generic_project_harness(project_name=None):
@@ -75,6 +239,8 @@ def generic_project_harness(project_name=None):
 2. 使用 `rg --files` 定位模块、入口、测试、API 契约和依赖边界。
 3. 没有模块地图时，项目分配阶段必须先输出发现到的模块关系。
 4. 没有项目专属 reviewer 时，使用全局 `quality-*` agent 继续执行，并记录“无项目专属 reviewer”。
+
+项目发现结果建议输出 `project_discovery`，包含 modules、entrypoints、api_contracts、db_schema、async_jobs、message_topics、config_files、secret_sources、test_locations、validation_commands、external_dependencies 和 unknowns。
 """
 
 
@@ -95,6 +261,8 @@ def global_project_harness():
 2. 项目分配阶段必须输出模块发现结果和不确定点。
 3. 没有项目专属 reviewer 时，使用全局 `quality-*` agent 继续执行，并记录降级原因。
 4. 测试执行仍必须覆盖业务/API 数据准备、执行入口、断言、清理动作和清理验证。
+
+项目发现结果建议输出 `project_discovery`，包含 modules、entrypoints、api_contracts、db_schema、async_jobs、message_topics、config_files、secret_sources、test_locations、validation_commands、external_dependencies 和 unknowns。
 """
 
 
@@ -160,6 +328,7 @@ def skill_body(project=False):
         read("workflow.md"),
         project_harness() if project else global_project_harness(),
         "## 模板\n\n阶段文档模板位于本技能的 `assets/templates/` 目录。",
+        "## 配置\n\n风险分级和健康检查策略位于本技能的 `assets/config/` 目录。",
     ]
     return "\n\n".join(parts)
 
@@ -197,6 +366,7 @@ allowed-tools: Task, Read, Grep, Glob, Edit, MultiEdit, Write, Bash
 
 
 def claude_settings_json():
+    permissions = read_permissions()
     data = {
         "defaultMode": "acceptEdits",
         "permissions": {
@@ -204,23 +374,12 @@ def claude_settings_json():
                 "Bash(rg:*)",
                 "Bash(git status:*)",
                 "Bash(git diff:*)",
-                "Bash(mvn compile)",
-                "Bash(mvn test)",
-                "Bash(mvn -pl * -am -DskipTests compile)",
-                "Bash(mvn -pl * -am -Dtest=* -DfailIfNoTests=false test)",
+                *[f"Bash({claude_bash_pattern(command)})" for command in permissions["allow"]],
             ],
-            "ask": [
-                "Bash(git commit:*)",
-                "Bash(git push:*)",
-                "Bash(git push --force-with-lease:*)",
-                "Bash(mvn clean:*)",
-                "Bash(rm -rf:*)",
-            ],
+            "ask": [f"Bash({claude_bash_pattern(command)}:*)" for command in permissions["ask"]],
             "deny": [
-                "Bash(git reset --hard:*)",
-                "Bash(git push --force:*)",
-                "Read(./.env)",
-                "Read(./.env.*)",
+                *[f"Bash({claude_bash_pattern(command)}:*)" for command in permissions["deny"]],
+                *[f"Read({path})" for path in permissions["read_deny"]],
             ],
         },
         "hooks": {
@@ -278,92 +437,51 @@ def codex_hooks_json():
 
 
 def codex_rules():
+    permissions = read_permissions()
+    blocks = []
+    for command in permissions["allow"]:
+        blocks.append(codex_rule_block(command, "allow"))
+    for command in permissions["ask"]:
+        blocks.append(codex_rule_block(command, "prompt"))
+    for command in permissions["deny"]:
+        blocks.append(codex_rule_block(command, "forbidden"))
     return '''# LoopX 项目命令执行策略。
 # 作用：当命令需要跳出沙箱或触发审批时，Codex 会用这些规则决定允许、询问或禁止。
 # 本文件由 LoopX 中立源生成；请修改 ~/.loopx 后重新同步。
 
-prefix_rule(
-    pattern = ["mvn", "test"],
-    decision = "allow",
-    justification = "允许自动运行 Maven 测试，这是开发阶段的安全验证动作。",
-)
-
-prefix_rule(
-    pattern = ["mvn", "compile"],
-    decision = "allow",
-    justification = "允许自动运行 Maven 编译，这是开发阶段的安全验证动作。",
-)
-
-prefix_rule(
-    pattern = ["git", "reset", "--hard"],
-    decision = "forbidden",
-    justification = "禁止丢弃用户或 agent 的工作。需要先查看 git diff/status，并明确询问后才能回滚指定文件。",
-)
-
-prefix_rule(
-    pattern = ["git", "push", "--force"],
-    decision = "forbidden",
-    justification = "禁止强推。强推会改写远端历史，需要走明确的分支级审批和更安全的发布流程。",
-)
-
-prefix_rule(
-    pattern = ["git", "push", "--force-with-lease"],
-    decision = "prompt",
-    justification = "force-with-lease 仍会改写远端历史，执行前必须获得明确确认。",
-)
-
-prefix_rule(
-    pattern = ["rm", "-rf"],
-    decision = "prompt",
-    justification = "递归删除风险较高，执行前必须确认删除范围和原因。",
-)
-
-prefix_rule(
-    pattern = ["mvn", "clean"],
-    decision = "prompt",
-    justification = "mvn clean 会删除构建产物并可能显著增加验证耗时，执行前需要确认。",
-)
-
-prefix_rule(
-    pattern = ["git", "commit"],
-    decision = "prompt",
-    justification = "创建提交前需要确认已暂存内容和提交意图。",
-)
-
-prefix_rule(
-    pattern = ["git", "push"],
-    decision = "prompt",
-    justification = "推送远端必须由用户明确决定。",
-)
-'''
+''' + "\n".join(blocks)
 
 
-def claude_agent_file(name, source_file, model, effort, description):
-    body = read(f"agents/{source_file}")
+def claude_agent_file(agent):
+    body = read(f"agents/{agent['source_file']}")
     return f"""---
-name: {name}
-description: {description}
-tools: Read, Grep, Glob, Edit, MultiEdit, Write, Bash, Task
-model: {model}
-effort: {effort}
+name: {agent['name']}
+description: {json.dumps(agent['description'], ensure_ascii=False)}
+tools: {agent['tools']}
+model: {agent['claude_model']}
+effort: {agent['claude_effort']}
 ---
 
 {generated_notice()}
-{body}
-"""
-
-
-def codex_agent_file(name, source_file, effort, description):
-    body = read(f"agents/{source_file}")
-    escaped_description = json.dumps(description, ensure_ascii=False)
-    return f'''name = "{name}"
-description = {escaped_description}
-developer_instructions = """
-{generated_notice()}推荐运行模型：Codex 5.5（model: gpt-5.5），reasoning_effort={effort}。
+阶段：`{agent['phase']}`。角色：`{agent['role']}`。
 
 {body}
 """
-'''
+
+
+def codex_agent_file(agent):
+    body = read(f"agents/{agent['source_file']}")
+    instructions = f"""{generated_notice()}推荐运行模型：Codex 5.5（model: gpt-5.5），reasoning_effort={agent['codex_effort']}。
+阶段：`{agent['phase']}`。角色：`{agent['role']}`。
+
+{body}
+"""
+    return "\n".join([
+        f"name = {toml_string(agent['name'])}",
+        f"description = {toml_string(agent['description'])}",
+        f"developer_instructions = {toml_string(instructions)}",
+        "",
+    ])
 
 
 def user_prompt_hook(claude=False):
@@ -478,7 +596,13 @@ last = payload.get("last_assistant_message") or ""
 status = git_status(cwd)
 tracked_changes = [line for line in status if not line.startswith("??")]
 touched_code = any(
-    line[3:].endswith((".java", ".xml", ".sql", ".yml", ".yaml", ".properties"))
+    line[3:].endswith((
+        ".java", ".kt", ".kts", ".gradle",
+        ".xml", ".sql", ".yml", ".yaml", ".properties", ".toml", ".json",
+        ".js", ".jsx", ".ts", ".tsx",
+        ".py", ".go", ".rs", ".sh",
+        ".Dockerfile", "Dockerfile",
+    ))
     and not line[3:].startswith(".codex/")
     and not line[3:].startswith(".claude/")
     for line in tracked_changes
@@ -537,7 +661,9 @@ def doctor():
 
     add("source workflow", (SOURCE / "workflow.md").exists(), str(SOURCE / "workflow.md"))
     add("source agents", len(list((SOURCE / "agents").glob("*.md"))) >= len(AGENTS), str(SOURCE / "agents"))
-    add("source templates", len(list((SOURCE / "templates").glob("*.md"))) >= 8, str(SOURCE / "templates"))
+    add("source templates", len(list((SOURCE / "templates").glob("*.md"))) >= 9, str(SOURCE / "templates"))
+    add("source health policy", (SOURCE / "health.yml").exists(), str(SOURCE / "health.yml"))
+    add("source risk policy", (SOURCE / "risk.yml").exists(), str(SOURCE / "risk.yml"))
     add("sync command", (LOCAL_BIN / "loopx-sync").exists(), str(LOCAL_BIN / "loopx-sync"))
     add("codex skill", (CODEX_HOME / "skills" / "loopx" / "SKILL.md").exists(), str(CODEX_HOME / "skills" / "loopx"))
     add("codex agents", len(list((CODEX_HOME / "agents").glob("quality-*.toml"))) >= len(AGENTS), str(CODEX_HOME / "agents"))
@@ -569,7 +695,7 @@ def cleanup_project_quality_agents():
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        if "LoopX" in text or "loopx" in text or "quality-" in path.name:
+        if LOOPX_GENERATED_MARKER in text:
             path.unlink()
             print(f"remove project duplicate {path}")
 
@@ -600,29 +726,27 @@ def generate_global():
     install_command_wrapper()
     write(CODEX_HOME, "skills/loopx/SKILL.md", codex_skill(project=False))
     copy_templates(CODEX_HOME, "skills/loopx/assets/templates")
+    copy_configs(CODEX_HOME, "skills/loopx/assets/config")
     write(CLAUDE_HOME, "skills/loopx/SKILL.md", claude_skill(project=False))
     copy_templates(CLAUDE_HOME, "skills/loopx/assets/templates")
-    for name, source_file, model, claude_effort, description in AGENTS:
-        codex_effort = "medium"
-        if "solution" in name or name == "quality-code-reviewer":
-            codex_effort = "xhigh"
-        elif name in {"quality-project-manager", "quality-test-designer", "quality-test-reviewer"}:
-            codex_effort = "high"
-        write(CODEX_HOME, f"agents/{name}.toml", codex_agent_file(name, source_file, codex_effort, description))
-        write(CLAUDE_HOME, f"agents/{name}.md", claude_agent_file(name, source_file, model, claude_effort, description))
+    copy_configs(CLAUDE_HOME, "skills/loopx/assets/config")
+    for agent in AGENTS:
+        write(CODEX_HOME, f"agents/{agent['name']}.toml", codex_agent_file(agent))
+        write(CLAUDE_HOME, f"agents/{agent['name']}.md", claude_agent_file(agent))
 
 
 def generate_project():
     cleanup_project_quality_agents()
     cleanup_project_stale_files()
     sync_project_claude_agents()
-    write(PROJECT, "AGENTS.md", codex_agents_md())
-    write(PROJECT, "CLAUDE.md", claude_md())
+    write_project_entry(PROJECT, "AGENTS.md", codex_agents_md())
+    write_project_entry(PROJECT, "CLAUDE.md", claude_md())
     write(PROJECT, ".codex/config.toml", codex_config())
     write(PROJECT, ".codex/hooks.json", codex_hooks_json())
     write(PROJECT, ".codex/rules/loopx.rules", codex_rules())
     write(PROJECT, ".codex/skills/loopx/SKILL.md", codex_skill(project=True))
     copy_templates(PROJECT, ".codex/skills/loopx/assets/templates")
+    copy_configs(PROJECT, ".codex/skills/loopx/assets/config")
     write(PROJECT, ".codex/hooks/user_prompt_quality_gate.py", user_prompt_hook(claude=False))
     write(PROJECT, ".codex/hooks/pre_tool_use_policy.py", pre_tool_hook(claude=False))
     write(PROJECT, ".codex/hooks/stop_quality_gate_check.py", stop_hook(claude=False))
@@ -630,6 +754,7 @@ def generate_project():
     write(PROJECT, ".claude/commands/loopx.md", claude_command())
     write(PROJECT, ".claude/skills/loopx/SKILL.md", claude_skill(project=True))
     copy_templates(PROJECT, ".claude/skills/loopx/assets/templates")
+    copy_configs(PROJECT, ".claude/skills/loopx/assets/config")
     write(PROJECT, ".claude/hooks/user_prompt_loopx.py", user_prompt_hook(claude=True))
     write(PROJECT, ".claude/hooks/pre_tool_use_policy.py", pre_tool_hook(claude=True))
     write(PROJECT, ".claude/hooks/stop_loopx_check.py", stop_hook(claude=True))
