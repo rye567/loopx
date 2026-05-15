@@ -4,25 +4,42 @@ LoopX Kit 是可跨项目、跨机器安装的本地工程质量门工具包。�
 
 ## 安装
 
+跨平台推荐：
+
 ```bash
 git clone git@github.com:rye567/loopx-kit.git
 cd loopx-kit
+python install.py
+```
+
+Windows 也可以使用：
+
+```bat
+install.cmd
+```
+
+macOS/Linux 也可以使用：
+
+```bash
 bash install.sh
 ```
 
 安装后会写入：
 
 - `~/.loopx`
-- `~/.local/bin/loopx-sync`
+- macOS/Linux：`~/.local/bin/loopx-sync`
+- Windows：`%LOCALAPPDATA%\LoopX\bin\loopx-sync.cmd` 和 `loopx-sync.ps1`
 - `~/.codex/skills/loopx`
 - `~/.codex/agents/quality-*.toml`
 - `~/.claude/skills/loopx`
 - `~/.claude/agents/quality-*.md`
 
+Windows 安装器会自动把 `%LOCALAPPDATA%\LoopX\bin` 写入用户 PATH；通常重开终端后即可直接执行 `loopx-sync`。
+
 如果要在当前项目同时生成项目适配层：
 
 ```bash
-bash install.sh --project
+python install.py --project
 ```
 
 ## 使用
@@ -49,7 +66,7 @@ $loopx 处理需求：...
 
 ```bash
 git pull
-bash install.sh
+python install.py
 ```
 
 ## 检查
@@ -62,8 +79,18 @@ loopx-sync version
 ## 卸载
 
 ```bash
-bash uninstall.sh --yes
+python uninstall.py --yes
 ```
+
+Windows 也可以使用：
+
+```bat
+uninstall.cmd --yes
+```
+
+## 跨平台约束
+
+LoopX 不依赖 `/data`、`/usr/bin/python3`、`~/.local/bin` 等单一平台路径。同步器会按当前系统生成本机可用的 wrapper、hooks 和用户级安装目录。项目内路径统一使用相对路径，避免把某台机器的绝对路径同步到其它机器。
 
 ## 仓库策略
 

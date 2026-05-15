@@ -12,7 +12,18 @@ HOME = Path.home()
 GLOBAL_LOOPX = HOME / ".loopx"
 CODEX_HOME = Path(os.environ.get("CODEX_HOME", HOME / ".codex"))
 CLAUDE_HOME = HOME / ".claude"
-LOCAL_BIN = HOME / ".local" / "bin"
+
+
+def default_local_bin():
+    if os.name == "nt":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return Path(local_app_data) / "LoopX" / "bin"
+        return HOME / "AppData" / "Local" / "LoopX" / "bin"
+    return HOME / ".local" / "bin"
+
+
+LOCAL_BIN = Path(os.environ.get("LOOPX_BIN_DIR", default_local_bin()))
 
 AGENTS = [
     {
@@ -248,6 +259,15 @@ def toml_string(value):
     return json.dumps(value, ensure_ascii=False)
 
 
+def shell_quote(value):
+    text = str(value)
+    return '"' + text.replace('"', '\\"') + '"'
+
+
+def python_command(script_rel):
+    return f"{shell_quote(sys.executable)} {shell_quote(script_rel)}"
+
+
 def generic_project_harness(project_name=None):
     current_project = f"当前项目：`{project_name}`。\n\n" if project_name else ""
     return f"""# 项目规则入口
@@ -406,9 +426,9 @@ def claude_settings_json():
             ],
         },
         "hooks": {
-            "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3 .claude/hooks/user_prompt_loopx.py"}]}],
-            "PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "python3 .claude/hooks/pre_tool_use_policy.py"}]}],
-            "Stop": [{"hooks": [{"type": "command", "command": "python3 .claude/hooks/stop_loopx_check.py"}]}],
+            "UserPromptSubmit": [{"hooks": [{"type": "command", "command": python_command(".claude/hooks/user_prompt_loopx.py")}]}],
+            "PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": python_command(".claude/hooks/pre_tool_use_policy.py")}]}],
+            "Stop": [{"hooks": [{"type": "command", "command": python_command(".claude/hooks/stop_loopx_check.py")}]}],
         },
     }
     return json.dumps(data, ensure_ascii=False, indent=2)
@@ -432,7 +452,7 @@ def codex_hooks_json():
             "UserPromptSubmit": [{
                 "hooks": [{
                     "type": "command",
-                    "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/user_prompt_quality_gate.py\"",
+                    "command": python_command(".codex/hooks/user_prompt_quality_gate.py"),
                     "timeout": 10,
                     "statusMessage": "检查 LoopX 触发条件",
                 }],
@@ -441,7 +461,7 @@ def codex_hooks_json():
                 "matcher": "^Bash$",
                 "hooks": [{
                     "type": "command",
-                    "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/pre_tool_use_policy.py\"",
+                    "command": python_command(".codex/hooks/pre_tool_use_policy.py"),
                     "timeout": 10,
                     "statusMessage": "检查命令策略",
                 }],
@@ -449,7 +469,7 @@ def codex_hooks_json():
             "Stop": [{
                 "hooks": [{
                     "type": "command",
-                    "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/stop_quality_gate_check.py\"",
+                    "command": python_command(".codex/hooks/stop_quality_gate_check.py"),
                     "timeout": 10,
                     "statusMessage": "检查 LoopX 阶段文档",
                 }],
@@ -568,6 +588,10 @@ BLOCK_PATTERNS = [
     (r"\\b(drop|truncate)\\s+(database|schema|table)\\b", "禁止执行破坏性数据库 DDL；必须先有审查过的迁移和回滚方案。"),
     (r"\\bdelete\\s+from\\s+\\S+\\s*;?\\s*$", "禁止执行没有明显 WHERE 条件的 DELETE 语句。"),
     (r"\\brm\\s+-rf\\s+(/|~|\\$HOME)\\b", "禁止对根目录或用户主目录执行递归删除。"),
+    (r"\\brmdir\\s+/s\\s+/q\\s+(\\\\|[a-z]:\\\\|%USERPROFILE%)\\b", "禁止对磁盘根目录或用户主目录执行递归删除。"),
+    (r"\\brd\\s+/s\\s+/q\\s+(\\\\|[a-z]:\\\\|%USERPROFILE%)\\b", "禁止对磁盘根目录或用户主目录执行递归删除。"),
+    (r"\\bdel\\s+/s\\s+/q\\s+(\\\\|[a-z]:\\\\|%USERPROFILE%)\\b", "禁止对磁盘根目录或用户主目录执行递归删除。"),
+    (r"\\bremove-item\\b.*\\b-recurse\\b.*\\b-force\\b.*(\\\\|[a-z]:\\\\|\\$env:USERPROFILE)", "禁止对磁盘根目录或用户主目录执行递归删除。"),
 ]
 
 
@@ -650,13 +674,31 @@ def install_source_to_global():
 
 def install_command_wrapper():
     LOCAL_BIN.mkdir(parents=True, exist_ok=True)
+    python = sys.executable
+    sync_script = GLOBAL_LOOPX / "tools" / "sync_loopx.py"
+
     wrapper = LOCAL_BIN / "loopx-sync"
     wrapper.write_text(f'''#!/usr/bin/env bash
 set -euo pipefail
-exec python3 "{GLOBAL_LOOPX}/tools/sync_loopx.py" "$@"
+exec "{python}" "{sync_script}" "$@"
 ''', encoding="utf-8")
-    wrapper.chmod(0o755)
+    try:
+        wrapper.chmod(0o755)
+    except OSError:
+        pass
     print(f"write {wrapper}")
+
+    cmd_wrapper = LOCAL_BIN / "loopx-sync.cmd"
+    cmd_wrapper.write_text(f'''@echo off
+"{python}" "{sync_script}" %*
+''', encoding="utf-8")
+    print(f"write {cmd_wrapper}")
+
+    ps_wrapper = LOCAL_BIN / "loopx-sync.ps1"
+    ps_wrapper.write_text(f'''& {shell_quote(python)} {shell_quote(sync_script)} @args
+exit $LASTEXITCODE
+''', encoding="utf-8")
+    print(f"write {ps_wrapper}")
 
 
 def manifest():
@@ -688,7 +730,12 @@ def doctor():
     add("source templates", len(list((SOURCE / "templates").glob("*.md"))) >= 9, str(SOURCE / "templates"))
     add("source health policy", (SOURCE / "health.yml").exists(), str(SOURCE / "health.yml"))
     add("source risk policy", (SOURCE / "risk.yml").exists(), str(SOURCE / "risk.yml"))
-    add("sync command", (LOCAL_BIN / "loopx-sync").exists(), str(LOCAL_BIN / "loopx-sync"))
+    sync_wrappers = [
+        LOCAL_BIN / "loopx-sync",
+        LOCAL_BIN / "loopx-sync.cmd",
+        LOCAL_BIN / "loopx-sync.ps1",
+    ]
+    add("sync command", any(path.exists() for path in sync_wrappers), str(LOCAL_BIN))
     add("codex skill", (CODEX_HOME / "skills" / "loopx" / "SKILL.md").exists(), str(CODEX_HOME / "skills" / "loopx"))
     add("codex agents", len(list((CODEX_HOME / "agents").glob("quality-*.toml"))) >= len(AGENTS), str(CODEX_HOME / "agents"))
     add("claude skill", (CLAUDE_HOME / "skills" / "loopx" / "SKILL.md").exists(), str(CLAUDE_HOME / "skills" / "loopx"))
