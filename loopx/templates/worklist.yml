@@ -3,6 +3,8 @@ run:
   requirement:
   mode:
   status:
+  current_stage:
+  next_action:
 
 items:
   - id: W001
@@ -15,5 +17,12 @@ items:
     dependencies: []
     validation: []
     status:
+    failed_by:
+    return_to:
+    required_changes: []
+    accepted_risk:
+      accepted: false
+      accepted_by:
+      reason:
     evidence: []
     notes:

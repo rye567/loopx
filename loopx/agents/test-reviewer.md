@@ -13,6 +13,8 @@
 - 是否区分代码失败、测试设计失败和环境不可用
 - 是否区分三方工具缺失时的 `SKIPPED`、`CI_REQUIRED` 和 `BLOCKED`
 
-失败时返回 `CHANGES_REQUIRED`，并明确回到测试用例设计的修改项。
+失败时返回 `CHANGES_REQUIRED`，并明确 `return_to: 测试用例设计`、失败原因、影响范围、证据、需要修正的 worklist item 和修改清单。
 
 通过时返回 `PASS` 后必须提醒主会话等待用户确认，不能自动进入开发阶段。
+
+必须输出 `stage_result`。测试用例审核不得直接修改代码；只能要求测试用例设计阶段修正。

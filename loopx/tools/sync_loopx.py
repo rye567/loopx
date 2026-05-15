@@ -82,9 +82,20 @@ AGENTS = [
         "description": "开发阶段：auto 修改代码、补测试并运行编译和定向测试。",
     },
     {
+        "name": "quality-gate-auditor",
+        "source_file": "quality-auditor.md",
+        "phase": "07-quality-audit",
+        "role": "review",
+        "claude_model": "opus",
+        "claude_effort": "xhigh",
+        "codex_effort": "xhigh",
+        "tools": "Read, Grep, Glob, Bash",
+        "description": "通用质量审计：检查阶段状态机、写入门禁、worklist 和证据闭环。",
+    },
+    {
         "name": "quality-code-reviewer",
         "source_file": "code-reviewer.md",
-        "phase": "07-code-review",
+        "phase": "08-code-review",
         "role": "review",
         "claude_model": "opus",
         "claude_effort": "xhigh",
@@ -95,7 +106,7 @@ AGENTS = [
     {
         "name": "quality-test-runner",
         "source_file": "test-runner.md",
-        "phase": "08-test-report",
+        "phase": "09-test-report",
         "role": "verify",
         "claude_model": "sonnet",
         "claude_effort": "medium",
@@ -129,6 +140,10 @@ def read_project(rel):
     if path.exists():
         return path.read_text(encoding="utf-8")
     return ""
+
+
+def has_project_source(rel):
+    return (PROJECT / ".codex" / "loopx-project" / rel).exists()
 
 
 def read_permissions():
@@ -204,6 +219,8 @@ def write_project_entry(root, rel, text):
 
 def copy_templates(root, rel):
     target = root / rel
+    if target.exists():
+        shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
     for template in sorted((SOURCE / "templates").iterdir()):
         if template.is_file():
@@ -213,6 +230,8 @@ def copy_templates(root, rel):
 
 def copy_configs(root, rel):
     target = root / rel
+    if target.exists():
+        shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
     for name in CONFIG_FILES:
         source = SOURCE / name
@@ -286,13 +305,15 @@ def generic_agents_md():
 ## LoopX
 1. 用户要求质量门、完整 loop、阶段文档或 `$loopx` 时，使用全局 `loopx` skill。
 2. `$loopx` 即表示授权阶段子 agent 和推荐模型策略，除非用户明确禁用。
-3. 当前 LoopX 处于验证期：方案审核、测试用例审核、代码审查和测试执行 PASS 后必须等待用户确认，不能全自动进入下一阶段。
-4. 本地执行必须先做环境检查，区分代码问题、测试设计问题和环境问题。
-5. 开发阶段默认 auto：用户确认测试用例审核通过后，可自动修改受影响代码/测试/阶段文档，并运行编译、单元测试和定向测试。
-6. git commit/push、清库、强删、越权写入、生产/联调写入和真实外部系统调用仍需确认。
-7. 测试用例和测试报告必须覆盖业务/API 数据准备、runId/数据前缀、执行入口、断言、清理动作和清理验证。
-8. 最终结论必须区分本地通过、本地阻塞、未覆盖/需 CI 验证。
-9. 整个流程完成前必须执行 `/health`，并把结果写入最终测试报告。
+3. 每阶段必须输出 `stage_result`；`CHANGES_REQUIRED` 或 `BLOCKED` 必须按 `return_to` 回退或等待处理，不能继续向下推进。
+4. 当前 LoopX 处于验证期：方案审核、测试用例审核、代码审查和测试执行 PASS 后必须等待用户确认，不能全自动进入下一阶段。
+5. 本地执行必须先做环境检查，区分代码问题、测试设计问题和环境问题。
+6. 未显式分级前不得写业务代码/测试/配置/SQL；`STANDARD/FULL` 未过方案审核和测试用例审核不得开发；`LIGHT` 必须显式声明影响范围和跳过门。
+7. 开发阶段默认 auto：用户确认测试用例审核通过后，可自动修改受影响代码/测试/阶段文档，并运行编译、单元测试和定向测试。
+8. git commit/push、清库、强删、越权写入、生产/联调写入和真实外部系统调用仍需确认。
+9. 测试用例和测试报告必须覆盖业务/API 数据准备、runId/数据前缀、执行入口、断言、清理动作和清理验证。
+10. 最终结论必须区分本地通过、本地阻塞、未覆盖/需 CI 验证。
+11. 整个流程完成前必须执行 `/health`，并把结果写入最终测试报告。
 """
 
 
@@ -316,7 +337,9 @@ def claude_md():
 
 - 阶段文档写入 `docs/loopx-runs/<date>-<slug>/`。
 - 当前 LoopX 处于验证期：方案审核、测试用例审核、代码审查和测试执行 PASS 后必须等待用户确认，不能全自动进入下一阶段。
+- 每阶段必须输出 `stage_result`；`CHANGES_REQUIRED` 或 `BLOCKED` 必须按 `return_to` 回退或等待处理。
 - 本地执行必须先做环境检查；最终结论必须区分本地通过、本地阻塞、未覆盖/需 CI 验证。
+- 未显式分级前不得写业务代码/测试/配置/SQL；STANDARD/FULL 未过方案审核和测试用例审核不得开发；LIGHT 必须显式声明影响范围和跳过门。
 - 整个流程完成前必须执行 `/health`，并把结果写入最终测试报告。
 - 开发阶段默认 auto：用户确认测试用例审核通过后，可自动修改受影响代码/测试/阶段文档，并运行编译、单元测试和定向测试。
 - 仍需确认：git commit/push、强推、清库、强删、越权目录写入、生产/联调环境写入、真实外部系统调用。
@@ -361,7 +384,7 @@ allowed-tools: Task, Read, Grep, Glob, Edit, MultiEdit, Write, Bash
 
 按 LoopX 执行需求：$ARGUMENTS
 
-默认允许阶段子 agent；先做本地环境检查；审核/验证阶段 PASS 后必须等待用户确认；开发阶段 auto，可改代码、补测试、运行编译和定向测试；流程完成前必须执行 /health。最终结论区分本地通过/阻塞/CI 未覆盖，高风险动作仍需确认。
+默认允许阶段子 agent；先做本地环境检查；每阶段输出 stage_result；CHANGES_REQUIRED/BLOCKED 按 return_to 回退或等待处理；审核/验证阶段 PASS 后必须等待用户确认；满足写入门禁后开发阶段 auto，可改代码、补测试、运行编译和定向测试；流程完成前必须执行 /health。最终结论区分本地通过/阻塞/CI 未覆盖，高风险动作仍需确认。
 """
 
 
@@ -500,6 +523,7 @@ if any(re.search(p, prompt, re.IGNORECASE) for p in patterns):
     context = (
         "{prefix} 提醒：请读取项目 harness 和 loopx skill。"
         "/loopx 或 $loopx 表示授权阶段子 agent；审核/验证阶段 PASS 后必须等待用户确认。"
+        "每阶段必须输出 stage_result；CHANGES_REQUIRED/BLOCKED 必须按 return_to 回退或等待处理。"
         "本地执行先做环境检查；开发阶段 auto，可改代码、补测试、运行编译和定向测试。"
         "流程完成前必须执行 /health。最终结论必须区分本地通过、本地阻塞、未覆盖/需 CI 验证。"
         "测试必须包含业务/API 数据准备、执行入口、断言、清理和清理验证。"
@@ -739,8 +763,14 @@ def generate_project():
     cleanup_project_quality_agents()
     cleanup_project_stale_files()
     sync_project_claude_agents()
-    write_project_entry(PROJECT, "AGENTS.md", codex_agents_md())
-    write_project_entry(PROJECT, "CLAUDE.md", claude_md())
+    if has_project_source("codex-agents.md"):
+        write(PROJECT, "AGENTS.md", codex_agents_md())
+    else:
+        write_project_entry(PROJECT, "AGENTS.md", codex_agents_md())
+    if has_project_source("claude.md"):
+        write(PROJECT, "CLAUDE.md", claude_md())
+    else:
+        write_project_entry(PROJECT, "CLAUDE.md", claude_md())
     write(PROJECT, ".codex/config.toml", codex_config())
     write(PROJECT, ".codex/hooks.json", codex_hooks_json())
     write(PROJECT, ".codex/rules/loopx.rules", codex_rules())

@@ -1,4 +1,4 @@
-# 09 健康检查
+# 10 健康检查
 
 - 状态：
 - Worklist 完成情况：
@@ -16,6 +16,20 @@
 - /health 评分：
 - 阻塞项：
 - 最终门禁结论：
+
+## stage_result
+
+```yaml
+stage_result:
+  stage: "10 Health Gate"
+  status:
+  return_to:
+  next_action:
+  affected_work_items: []
+  evidence: []
+  user_confirmation_required:
+  blocked_reason:
+```
 
 ## Evidence
 

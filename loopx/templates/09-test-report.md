@@ -1,4 +1,4 @@
-# 08 测试报告
+# 09 测试报告
 
 - 状态：
 - 执行环境：
@@ -15,6 +15,20 @@
 - 本地结论：
 - CI/远端未覆盖：
 - 最终结论：
+
+## stage_result
+
+```yaml
+stage_result:
+  stage: "09 测试执行"
+  status:
+  return_to:
+  next_action:
+  affected_work_items: []
+  evidence: []
+  user_confirmation_required:
+  blocked_reason:
+```
 
 ## Evidence
 
