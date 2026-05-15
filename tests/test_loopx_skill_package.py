@@ -36,9 +36,12 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertIn("## 不可跳过规则", text)
         self.assertIn("init --mode auto", text)
         self.assertIn("advance --to", text)
-        self.assertIn("review-feedback", text)
+        self.assertIn("fail-review", text)
+        self.assertIn("claim-stage", text)
+        self.assertIn("close-repair", text)
         self.assertIn("can-write --kind business", text)
         self.assertIn("`validate PASS` 只代表结构合法", text)
+        self.assertIn("返工任务", text)
 
     def test_skill_references_existing_resources(self):
         text = (LOOPX / "SKILL.md").read_text(encoding="utf-8")

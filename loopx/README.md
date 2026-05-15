@@ -30,8 +30,10 @@ python tools/loopx_controller.py status
 python tools/loopx_controller.py validate
 python tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
 python tools/loopx_controller.py advance --to solution_review
-python tools/loopx_controller.py review-feedback --item W1 --return-to solution_design --reason "原因"
+python tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
+python tools/loopx_controller.py claim-stage solution_design
+python tools/loopx_controller.py close-repair --item W1 --artifact stage-results/03-solution-design.json --revision 2 --change "修正说明"
 python tools/loopx_controller.py can-write --kind business
 ```
 
-它会创建 `.loopx/runs/<run_id>/` 下的运行状态、worklist 和阶段结果。`validate` 只说明结构合法；`advance` 才负责阶段流转，`can-write` 才负责业务代码写入解锁。控制器只使用 Python 标准库，并使用 `schemas/*.schema.json` 中的结构契约。
+它会创建 `.loopx/runs/<run_id>/` 下的运行状态、worklist、阶段结果和返工任务。`validate` 只说明结构合法；`advance` 负责阶段流转，`fail-review`/`claim-stage`/`close-repair` 负责 review-driven repair loop，`can-write` 负责业务代码写入解锁。控制器只使用 Python 标准库，并使用 `schemas/*.schema.json` 中的结构契约。

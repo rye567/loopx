@@ -22,10 +22,12 @@ python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-ta
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-4. 用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须立刻记录反馈并回退：
+4. Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须创建返工任务并回到被评审阶段 owner agent；不得只手改 `current_stage`：
 
 ```bash
-python loopx/tools/loopx_controller.py review-feedback --item W1 --return-to solution_design --reason "原因"
+python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
+python loopx/tools/loopx_controller.py claim-stage solution_design
+python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/03-solution-design.json --revision 2 --change "修正说明"
 ```
 
 5. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行必须有阶段 `PASS`、写入闸门 `PASS` 和 health gate 证据。
@@ -53,7 +55,7 @@ python loopx/tools/loopx_controller.py review-feedback --item W1 --return-to sol
 2. 按 `risk.yml` 准备风险标签，并用 `init --mode auto --risk-tags ...` 让控制器判定 `LIGHT`、`STANDARD` 或 `FULL`。
 3. 按 `workflow.md` 的阶段顺序推进，并在每个阶段读取 `agents/` 中对应角色说明。
 4. 当执行深度要求阶段产物时，使用 `templates/` 输出阶段文档。
-5. 每个阶段结束后写入 `stage-results/*.json`，再用 `advance --to ...` 检查能否进入下一阶段。
+5. 每个阶段结束后写入 `stage-results/*.json`，再用 `advance --to ...` 检查能否进入下一阶段；若存在未关闭的返工任务，先 `claim-stage` 修原产物并 `close-repair`。
 6. 最终结论必须区分本地验证结果、环境阻塞、未覆盖项和需要 CI/远端验证的部分。
 
 ## 状态控制器
@@ -66,7 +68,9 @@ python loopx/tools/loopx_controller.py status
 python loopx/tools/loopx_controller.py validate
 python loopx/tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
 python loopx/tools/loopx_controller.py advance --to solution_review
-python loopx/tools/loopx_controller.py review-feedback --item W1 --return-to solution_design --reason "原因"
+python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
+python loopx/tools/loopx_controller.py claim-stage solution_design
+python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/03-solution-design.json --revision 2 --change "修正说明"
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
