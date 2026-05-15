@@ -1,34 +1,34 @@
-# 12 Final Report
+# 12 最终报告
 
-## Outcome
+## 结果
 
-- Final status:
-- Requirement id:
-- Mode:
-- Completed stages:
+- 最终状态：
+- 需求 id：
+- 执行深度：
+- 已完成阶段：
 
-## What Changed
+## 变更内容
 
 -
 
-## Validation Evidence
+## 验证证据
 
-| Check | Status | Evidence | Gap |
+| 检查 | 状态 | 证据 | 缺口 |
 | --- | --- | --- | --- |
-| Local build |  |  |  |
-| Unit tests |  |  |  |
-| Targeted tests |  |  |  |
+| 本地构建 |  |  |  |
+| 单元测试 |  |  |  |
+| 定向测试 |  |  |  |
 | Health Gate |  |  |  |
-| CI / remote |  |  |  |
+| CI / 远端 |  |  |  |
 
-## Risks and Accepted Gaps
-
--
-
-## Release / Next Steps
+## 风险和已接受缺口
 
 -
 
-## Statement
+## 发布 / 下一步
 
-This report must clearly distinguish `local pass`, `local blocked`, and `not covered / CI required`. Do not claim full completion when CI, remote systems or required tools were not executed.
+-
+
+## 声明
+
+本报告必须清楚区分 `本地通过`、`本地阻塞` 和 `未覆盖 / 需要 CI`。没有执行 CI、远端系统或必需工具时，不得宣称完整完成。

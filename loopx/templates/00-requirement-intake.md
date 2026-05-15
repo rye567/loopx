@@ -1,42 +1,42 @@
-# 00 Requirement Intake
+# 00 需求接收
 
-## Requirement Summary
+## 需求摘要
 
-- Requirement id:
-- Title:
-- User / actor:
-- Current problem:
-- Desired outcome:
+- 需求 id：
+- 标题：
+- 用户 / 角色：
+- 当前问题：
+- 期望结果：
 
-## Scope
+## 范围
 
-### In Scope
-
--
-
-### Out of Scope
+### 范围内
 
 -
 
-## Acceptance Criteria
+### 范围外
 
-| ID | Criterion | Observable Evidence |
+-
+
+## 验收标准
+
+| ID | 标准 | 可观察证据 |
 | --- | --- | --- |
 | AC-001 |  |  |
 
-## Edge Cases
+## 边界场景
 
 -
 
-## Non-functional Requirements
+## 非功能需求
 
-- Security:
-- Performance:
-- Compatibility:
-- Observability:
-- Reliability:
+- 安全：
+- 性能：
+- 兼容：
+- 可观测性：
+- 可靠性：
 
-## Risks and Dependencies
+## 风险和依赖
 
 ```yaml
 risk_tags: []
@@ -44,7 +44,7 @@ dependencies: []
 open_questions: []
 ```
 
-## Stage Result
+## 阶段结果
 
 ```yaml
 stage_result:

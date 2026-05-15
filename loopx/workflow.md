@@ -132,12 +132,18 @@ stage_result:
 生产化运行优先使用 bundled controller 脚本持久化状态：
 
 ```bash
-python tools/loopx_controller.py init "需求描述"
+python tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
 python tools/loopx_controller.py status
 python tools/loopx_controller.py validate
+python tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
+python tools/loopx_controller.py advance --to solution_review
+python tools/loopx_controller.py review-feedback --item W1 --return-to solution_design --reason "原因"
+python tools/loopx_controller.py can-write --kind business
 ```
 
 控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。
+
+`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`，业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`。用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `review-feedback` 写入 `CHANGES_REQUIRED` 并回到 `return_to` 阶段。
 
 ## 本地执行硬约束
 

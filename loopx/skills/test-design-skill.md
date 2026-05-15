@@ -1,38 +1,38 @@
-# Test Design Skill
+# 测试设计技能
 
-## Purpose
+## 目的
 
-Design executable test cases that prove acceptance criteria and risk mitigations.
+设计可执行测试用例，证明验收标准和风险缓解措施。
 
-## Inputs
+## 输入
 
-- Requirement artifact.
-- Solution design artifact.
-- Testing standard.
-- Project profile commands and environment constraints.
+- 需求产物。
+- 方案设计产物。
+- 测试标准。
+- 项目 profile 中的验证命令和环境约束。
 
-## Procedure
+## 步骤
 
-1. Map every acceptance criterion to test cases.
-2. Add boundary, invalid, permission and regression cases where relevant.
-3. Define data setup with unique `runId` or prefix.
-4. Define execution entrypoint and commands.
-5. Define assertions, cleanup steps and cleanup verification.
-6. Mark local, CI-required and manual checks separately.
+1. 把每条验收标准映射到测试用例。
+2. 按需补充边界、非法输入、权限和回归用例。
+3. 定义带唯一 `runId` 或前缀的数据准备方式。
+4. 定义执行入口和命令。
+5. 定义断言、清理动作和清理验证。
+6. 区分本地检查、CI 必需检查和人工检查。
 
-## Output
+## 输出
 
-- Test case artifact.
-- Coverage matrix.
-- Environment gaps.
-- `stage_result` evidence.
+- 测试用例产物。
+- 覆盖矩阵。
+- 环境缺口。
+- `stage_result` 证据。
 
-## Pass Criteria
+## 通过标准
 
-- No acceptance criterion is unmapped.
-- Each test has setup, execution, assertions, cleanup and cleanup verification.
-- CI-required checks are explicit and not counted as local pass.
+- 没有验收标准缺少映射。
+- 每个测试都有准备、执行、断言、清理和清理验证。
+- CI 必需检查被明确标记，不能算作本地通过。
 
-## Failure Handling
+## 失败处理
 
-Return to requirement or solution design when criteria are untestable. Return to test design for missing coverage or cleanup.
+验收标准不可测试时返回需求或方案设计。覆盖或清理缺失时返回测试设计。
