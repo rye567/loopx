@@ -60,7 +60,7 @@
 
 ## 风险分级
 
-执行分级时必须优先读取 `assets/config/risk.yml`：
+执行分级时必须优先读取 `risk.yml`：
 
 - 命中 `critical_triggers` 中任一风险标签，直接选择 `FULL`。
 - 未命中关键触发项时，按 `score_rules` 对识别到的风险标签求和，并按 `thresholds` 选择 `LIGHT`、`STANDARD` 或 `FULL`。
@@ -129,15 +129,15 @@ stage_result:
 
 ## Controller 和 Schema
 
-生产化运行优先使用 `loopx` 控制器持久化状态：
+生产化运行优先使用 bundled controller 脚本持久化状态：
 
 ```bash
-loopx init "需求描述"
-loopx status
-loopx validate
+python tools/loopx_controller.py init "需求描述"
+python tools/loopx_controller.py status
+python tools/loopx_controller.py validate
 ```
 
-控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `loopx validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。
+控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。
 
 ## 本地执行硬约束
 
