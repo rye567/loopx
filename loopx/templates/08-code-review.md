@@ -1,20 +1,18 @@
-# 02 方案设计
+# 08 代码审查
 
 - 状态：
-- 方案：
-- 数据流：
-- 接口/契约：
-- 影响范围：
-- 兼容策略：
-- 回滚策略：
-- 验证策略：
+- Findings：
+- Open Questions：
+- Change Summary：
+- Verdict：
+- Evidence：
 - 下一阶段：
 
 ## stage_result
 
 ```yaml
 stage_result:
-  stage: "02 方案设计"
+  stage: "08 代码审查"
   status:
   return_to:
   next_action:

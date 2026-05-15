@@ -49,8 +49,10 @@ fi
 mkdir -p "$LOOPX_HOME" "$LOCAL_BIN"
 
 if command -v rsync >/dev/null 2>&1; then
-  rsync -a --exclude '.DS_Store' --exclude '__pycache__' --exclude '*.pyc' "$SOURCE/" "$LOOPX_HOME/"
+  rsync -a --delete --exclude '.DS_Store' --exclude '__pycache__' --exclude '*.pyc' "$SOURCE/" "$LOOPX_HOME/"
 else
+  rm -rf "$LOOPX_HOME"
+  mkdir -p "$LOOPX_HOME"
   (cd "$SOURCE" && tar cf - .) | (cd "$LOOPX_HOME" && tar xf -)
 fi
 
