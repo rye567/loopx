@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "owner": "rye567",
   "description": "LoopX cross-project quality gate kit for Codex and Claude Code.",
-  "install": "bash install.sh",
+  "install": "python install.py",
   "syncCommand": "loopx-sync",
   "targets": {
     "source": "~/.loopx",
+    "binPosix": "~/.local/bin/loopx-sync",
+    "binWindows": "%LOCALAPPDATA%\\LoopX\\bin\\loopx-sync.cmd",
     "codexSkill": "~/.codex/skills/loopx",
     "codexAgents": "~/.codex/agents/quality-*.toml",
     "claudeSkill": "~/.claude/skills/loopx",

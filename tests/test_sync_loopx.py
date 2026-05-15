@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import tomllib
 import unittest
+import sys
 from pathlib import Path
 
 
@@ -93,6 +94,35 @@ class SyncLoopxTest(unittest.TestCase):
         self.assertIn('pattern = ["mvn", "compile"]', rules)
         self.assertIn('pattern = ["git", "reset", "--hard"]', rules)
         self.assertIn('decision = "forbidden"', rules)
+
+    def test_generated_hooks_do_not_use_posix_only_paths(self):
+        hooks = json.loads(self.sync.codex_hooks_json())
+        encoded = json.dumps(hooks)
+        encoded_python = json.dumps(sys.executable)[1:-1]
+        self.assertNotIn("/usr/bin/python3", encoded)
+        self.assertNotIn("$(git rev-parse", encoded)
+        self.assertIn(encoded_python, encoded)
+
+        settings = json.loads(self.sync.claude_settings_json())
+        encoded_settings = json.dumps(settings)
+        self.assertIn(encoded_python, encoded_settings)
+        self.assertNotIn("python3 .claude/hooks", encoded_settings)
+
+    def test_install_command_wrapper_creates_posix_and_windows_entries(self):
+        old_local_bin = self.sync.LOCAL_BIN
+        old_global_loopx = self.sync.GLOBAL_LOOPX
+        try:
+            self.sync.LOCAL_BIN = self.tmp / "bin"
+            self.sync.GLOBAL_LOOPX = self.tmp / "loopx"
+            self.sync.install_command_wrapper()
+        finally:
+            self.sync.LOCAL_BIN = old_local_bin
+            self.sync.GLOBAL_LOOPX = old_global_loopx
+
+        self.assertTrue((self.tmp / "bin" / "loopx-sync").exists())
+        self.assertTrue((self.tmp / "bin" / "loopx-sync.cmd").exists())
+        self.assertTrue((self.tmp / "bin" / "loopx-sync.ps1").exists())
+        self.assertIn(sys.executable, (self.tmp / "bin" / "loopx-sync").read_text(encoding="utf-8"))
 
     def test_risk_policy_is_declared_in_workflow_and_assignment_agent(self):
         workflow = (ROOT / "loopx" / "workflow.md").read_text(encoding="utf-8")
