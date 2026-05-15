@@ -6,6 +6,7 @@
     "mode",
     "status",
     "current_stage",
+    "risk_tags",
     "confirmation_policy",
     "max_auto_repair",
     "worklist",
@@ -29,6 +30,12 @@
     },
     "current_stage": {
       "type": "string"
+    },
+    "risk_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "confirmation_policy": {
       "type": "string"

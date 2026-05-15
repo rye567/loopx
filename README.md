@@ -38,12 +38,15 @@ $loopx 处理需求：...
 LoopX 也提供一个本地状态控制器，用于把运行过程从纯提示词约束推进到可校验状态文件：
 
 ```bash
-python loopx/tools/loopx_controller.py init "需求描述"
+python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
 python loopx/tools/loopx_controller.py status
 python loopx/tools/loopx_controller.py validate
+python loopx/tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
+python loopx/tools/loopx_controller.py advance --to solution_review
+python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-控制器会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`validate` 会使用内置 schema 校验 run state、worklist 和阶段结果结构；它只依赖 Python 标准库。
+控制器会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`validate` 只校验 run state、worklist 和阶段结果的结构合法性；阶段推进和业务写入必须分别通过 `advance` 与 `can-write` 闸门。控制器只依赖 Python 标准库。
 
 ## 更新
 
