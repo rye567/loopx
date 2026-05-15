@@ -1,0 +1,46 @@
+{
+  "type": "object",
+  "required": [
+    "stage",
+    "status",
+    "return_to",
+    "next_action",
+    "affected_work_items",
+    "evidence",
+    "user_confirmation_required",
+    "blocked_reason"
+  ],
+  "properties": {
+    "stage": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK"]
+    },
+    "return_to": {
+      "type": "string"
+    },
+    "next_action": {
+      "type": "string"
+    },
+    "affected_work_items": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "user_confirmation_required": {
+      "type": "boolean"
+    },
+    "blocked_reason": {
+      "type": "string"
+    }
+  }
+}

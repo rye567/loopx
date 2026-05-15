@@ -1,5 +1,7 @@
 {
   "name": "loopx",
   "version": "0.1.0",
-  "description": "Global LoopX neutral source for Codex and Claude Code."
+  "description": "Global LoopX neutral source for Codex and Claude Code.",
+  "controllerCommand": "loopx",
+  "syncCommand": "loopx-sync"
 }

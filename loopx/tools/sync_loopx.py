@@ -131,6 +131,12 @@ LOOPX_GENERATED_MARKER = "请修改全局中立源 `~/.loopx` 后重新同步"
 MANAGED_SECTION_START = "<!-- BEGIN LOOPX MANAGED SECTION -->"
 MANAGED_SECTION_END = "<!-- END LOOPX MANAGED SECTION -->"
 CONFIG_FILES = ["health.yml", "risk.yml", "project-profiles.yml"]
+SCHEMA_FILES = [
+    "state.schema.json",
+    "stage-result.schema.json",
+    "worklist.schema.json",
+    "health-result.schema.json",
+]
 
 
 def source_label():
@@ -246,6 +252,18 @@ def copy_configs(root, rel):
     target.mkdir(parents=True, exist_ok=True)
     for name in CONFIG_FILES:
         source = SOURCE / name
+        if source.exists():
+            shutil.copy2(source, target / source.name)
+            print(f"copy {target / source.name}")
+
+
+def copy_schemas(root, rel):
+    target = root / rel
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True, exist_ok=True)
+    for name in SCHEMA_FILES:
+        source = SOURCE / "schemas" / name
         if source.exists():
             shutil.copy2(source, target / source.name)
             print(f"copy {target / source.name}")
@@ -372,6 +390,7 @@ def skill_body(project=False):
         project_harness() if project else global_project_harness(),
         "## 模板\n\n阶段文档模板位于本技能的 `assets/templates/` 目录。",
         "## 配置\n\n风险分级和健康检查策略位于本技能的 `assets/config/` 目录。",
+        "## Schemas\n\n运行状态、阶段结果、worklist 和 health 结果 schema 位于本技能的 `assets/schemas/` 目录。",
     ]
     return "\n\n".join(parts)
 
@@ -676,6 +695,7 @@ def install_command_wrapper():
     LOCAL_BIN.mkdir(parents=True, exist_ok=True)
     python = sys.executable
     sync_script = GLOBAL_LOOPX / "tools" / "sync_loopx.py"
+    controller_script = GLOBAL_LOOPX / "tools" / "loopx_controller.py"
 
     wrapper = LOCAL_BIN / "loopx-sync"
     wrapper.write_text(f'''#!/usr/bin/env bash
@@ -699,6 +719,29 @@ exec "{python}" "{sync_script}" "$@"
 exit $LASTEXITCODE
 ''', encoding="utf-8")
     print(f"write {ps_wrapper}")
+
+    controller = LOCAL_BIN / "loopx"
+    controller.write_text(f'''#!/usr/bin/env bash
+set -euo pipefail
+exec "{python}" "{controller_script}" "$@"
+''', encoding="utf-8")
+    try:
+        controller.chmod(0o755)
+    except OSError:
+        pass
+    print(f"write {controller}")
+
+    controller_cmd = LOCAL_BIN / "loopx.cmd"
+    controller_cmd.write_text(f'''@echo off
+"{python}" "{controller_script}" %*
+''', encoding="utf-8")
+    print(f"write {controller_cmd}")
+
+    controller_ps = LOCAL_BIN / "loopx.ps1"
+    controller_ps.write_text(f'''& {shell_quote(python)} {shell_quote(controller_script)} @args
+exit $LASTEXITCODE
+''', encoding="utf-8")
+    print(f"write {controller_ps}")
 
 
 def manifest():
@@ -730,12 +773,20 @@ def doctor():
     add("source templates", len(list((SOURCE / "templates").glob("*.md"))) >= 9, str(SOURCE / "templates"))
     add("source health policy", (SOURCE / "health.yml").exists(), str(SOURCE / "health.yml"))
     add("source risk policy", (SOURCE / "risk.yml").exists(), str(SOURCE / "risk.yml"))
+    add("source controller", (SOURCE / "tools" / "loopx_controller.py").exists(), str(SOURCE / "tools" / "loopx_controller.py"))
+    add("source schemas", len(list((SOURCE / "schemas").glob("*.schema.json"))) >= len(SCHEMA_FILES), str(SOURCE / "schemas"))
     sync_wrappers = [
         LOCAL_BIN / "loopx-sync",
         LOCAL_BIN / "loopx-sync.cmd",
         LOCAL_BIN / "loopx-sync.ps1",
     ]
     add("sync command", any(path.exists() for path in sync_wrappers), str(LOCAL_BIN))
+    controller_wrappers = [
+        LOCAL_BIN / "loopx",
+        LOCAL_BIN / "loopx.cmd",
+        LOCAL_BIN / "loopx.ps1",
+    ]
+    add("controller command", any(path.exists() for path in controller_wrappers), str(LOCAL_BIN))
     add("codex skill", (CODEX_HOME / "skills" / "loopx" / "SKILL.md").exists(), str(CODEX_HOME / "skills" / "loopx"))
     add("codex agents", len(list((CODEX_HOME / "agents").glob("quality-*.toml"))) >= len(AGENTS), str(CODEX_HOME / "agents"))
     add("claude skill", (CLAUDE_HOME / "skills" / "loopx" / "SKILL.md").exists(), str(CLAUDE_HOME / "skills" / "loopx"))
@@ -798,9 +849,11 @@ def generate_global():
     write(CODEX_HOME, "skills/loopx/SKILL.md", codex_skill(project=False))
     copy_templates(CODEX_HOME, "skills/loopx/assets/templates")
     copy_configs(CODEX_HOME, "skills/loopx/assets/config")
+    copy_schemas(CODEX_HOME, "skills/loopx/assets/schemas")
     write(CLAUDE_HOME, "skills/loopx/SKILL.md", claude_skill(project=False))
     copy_templates(CLAUDE_HOME, "skills/loopx/assets/templates")
     copy_configs(CLAUDE_HOME, "skills/loopx/assets/config")
+    copy_schemas(CLAUDE_HOME, "skills/loopx/assets/schemas")
     for agent in AGENTS:
         write(CODEX_HOME, f"agents/{agent['name']}.toml", codex_agent_file(agent))
         write(CLAUDE_HOME, f"agents/{agent['name']}.md", claude_agent_file(agent))
@@ -824,6 +877,7 @@ def generate_project():
     write(PROJECT, ".codex/skills/loopx/SKILL.md", codex_skill(project=True))
     copy_templates(PROJECT, ".codex/skills/loopx/assets/templates")
     copy_configs(PROJECT, ".codex/skills/loopx/assets/config")
+    copy_schemas(PROJECT, ".codex/skills/loopx/assets/schemas")
     write(PROJECT, ".codex/hooks/user_prompt_quality_gate.py", user_prompt_hook(claude=False))
     write(PROJECT, ".codex/hooks/pre_tool_use_policy.py", pre_tool_hook(claude=False))
     write(PROJECT, ".codex/hooks/stop_quality_gate_check.py", stop_hook(claude=False))
@@ -832,6 +886,7 @@ def generate_project():
     write(PROJECT, ".claude/skills/loopx/SKILL.md", claude_skill(project=True))
     copy_templates(PROJECT, ".claude/skills/loopx/assets/templates")
     copy_configs(PROJECT, ".claude/skills/loopx/assets/config")
+    copy_schemas(PROJECT, ".claude/skills/loopx/assets/schemas")
     write(PROJECT, ".claude/hooks/user_prompt_loopx.py", user_prompt_hook(claude=True))
     write(PROJECT, ".claude/hooks/pre_tool_use_policy.py", pre_tool_hook(claude=True))
     write(PROJECT, ".claude/hooks/stop_loopx_check.py", stop_hook(claude=True))

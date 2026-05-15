@@ -1,0 +1,114 @@
+{
+  "type": "object",
+  "required": ["run", "items"],
+  "properties": {
+    "run": {
+      "type": "object",
+      "required": ["id", "requirement", "mode", "status", "current_stage"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["LIGHT", "STANDARD", "FULL"]
+        },
+        "status": {
+          "type": "string"
+        },
+        "current_stage": {
+          "type": "string"
+        },
+        "next_action": {
+          "type": "string"
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "risk_tags",
+          "owner_agent",
+          "read_scope",
+          "write_scope",
+          "dependencies",
+          "validation",
+          "evidence",
+          "failed_by",
+          "return_to",
+          "required_changes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "risk_tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner_agent": {
+            "type": "string"
+          },
+          "read_scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "write_scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "validation": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed_by": {
+            "type": "string"
+          },
+          "return_to": {
+            "type": "string"
+          },
+          "required_changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

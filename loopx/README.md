@@ -14,12 +14,26 @@
 ## 私有落点
 
 - 全局中立源：`~/.loopx/`
+- 控制器入口：macOS/Linux 默认 `~/.local/bin/loopx`；Windows 默认 `%LOCALAPPDATA%\LoopX\bin\loopx.cmd`
 - 命令入口：macOS/Linux 默认 `~/.local/bin/loopx-sync`；Windows 默认 `%LOCALAPPDATA%\LoopX\bin\loopx-sync.cmd`
 - 全局 Codex：`~/.codex/skills/loopx/`、`~/.codex/agents/quality-*.toml`
 - 全局 Claude：`~/.claude/skills/loopx/`、`~/.claude/agents/quality-*.md`
 - 项目 Codex：`AGENTS.md`、`.codex/config.toml`、`.codex/hooks.json`、`.codex/rules/`、`.codex/hooks/`、`.codex/skills/loopx/`
 - Claude Code：`CLAUDE.md`、`.claude/`
 - 阶段文档：`docs/loopx-runs/<date>-<slug>/`
+- 运行状态：`.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl`、`stage-results/`
+
+## 状态控制器
+
+`loopx` 是 LoopX 的本地状态控制器，当前提供最小生产化闭环：
+
+```bash
+loopx init "需求描述"
+loopx status
+loopx validate
+```
+
+它会创建并校验 `.loopx/runs/<run_id>/` 下的运行状态、worklist 和阶段结果。校验器只使用 Python 标准库，并使用 `schemas/*.schema.json` 中的结构契约。
 
 同步脚本不会修改 `.gitignore`，也不会执行 `git add/commit/push`。
 

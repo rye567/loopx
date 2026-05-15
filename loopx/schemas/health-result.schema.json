@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "required": ["run_id", "status", "checks", "ci_gap_declared"],
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PASS", "PASS_WITH_WARNINGS", "LOCAL_INCOMPLETE_CI_REQUIRED", "BLOCKED"]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "evidence"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "ci_gap_declared": {
+      "type": "boolean"
+    }
+  }
+}
