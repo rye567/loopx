@@ -4,7 +4,7 @@
 
 必须先做本地环境检查：识别语言运行时、构建工具、目标模块、可用验证命令、必要依赖服务和外部系统/mock。发现环境缺口时必须记录，不得把环境失败当成代码失败。
 
-执行深度必须优先按 `assets/config/risk.yml` 判定：命中 `critical_triggers` 直接选择 `FULL`；否则按 `score_rules` 对风险标签求和，再按 `thresholds` 选择 `LIGHT`、`STANDARD` 或 `FULL`。
+执行深度必须优先按 `risk.yml` 判定：命中 `critical_triggers` 直接选择 `FULL`；否则按 `score_rules` 对风险标签求和，再按 `thresholds` 选择 `LIGHT`、`STANDARD` 或 `FULL`。
 
 如果 `risk.yml` 不存在、无法读取或字段不完整，降级使用 workflow 的自然语言风险规则，并在输出中记录“风险配置未覆盖/不可读”和降级原因。
 

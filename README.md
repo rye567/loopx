@@ -1,58 +1,21 @@
 # LoopX Kit
 
-LoopX Kit 是可跨项目、跨机器安装的本地工程质量门工具包。它把通用工作流、`quality-*` agent、模板、hooks 和同步器安装到用户级目录，再由每个项目保留自己的适配层。
+LoopX Kit 是一个用 Git 维护的跨工具工程质量门 skill 包。`loopx/` 是唯一主源，可分别安装到 Codex 和 Claude Code 的 skills 目录；更新时只需要对本仓库执行 `git pull`。
 
 ## 安装
 
-跨平台推荐：
+克隆仓库：
 
 ```bash
 git clone git@github.com:rye567/loopx-kit.git
 cd loopx-kit
-python install.py
 ```
 
-Windows 也可以使用：
-
-```bat
-install.cmd
-```
-
-macOS/Linux 也可以使用：
-
-```bash
-bash install.sh
-```
-
-安装后会写入：
-
-- `~/.loopx`
-- macOS/Linux：`~/.local/bin/loopx`
-- Windows：`%LOCALAPPDATA%\LoopX\bin\loopx.cmd` 和 `loopx.ps1`
-- macOS/Linux：`~/.local/bin/loopx-sync`
-- Windows：`%LOCALAPPDATA%\LoopX\bin\loopx-sync.cmd` 和 `loopx-sync.ps1`
-- `~/.codex/skills/loopx`
-- `~/.codex/agents/quality-*.toml`
-- `~/.claude/skills/loopx`
-- `~/.claude/agents/quality-*.md`
-
-Windows 安装器会自动把 `%LOCALAPPDATA%\LoopX\bin` 写入用户 PATH；通常重开终端后即可直接执行 `loopx-sync`。
-
-如果要在当前项目同时生成项目适配层：
-
-```bash
-python install.py --project
-```
+把 `loopx/` 目录复制或符号链接到目标工具的 skills 目录，并保留目录名为 `loopx`。Codex 和 Claude Code 各自按自己的 skill 机制安装即可；本仓库不再生成工具专属适配层。
 
 ## 使用
 
-在任意项目中执行：
-
-```bash
-loopx-sync project
-```
-
-然后在 Codex 使用：
+在 Codex 使用：
 
 ```text
 $loopx 处理需求：...
@@ -64,47 +27,33 @@ $loopx 处理需求：...
 /loopx 处理需求：...
 ```
 
+项目内如需提示入口，可以手动加入一小段说明：
+
+```text
+当用户要求 LoopX、质量门或完整阶段化交付时，使用已安装的 loopx skill；先读取当前项目 README、构建文件、主要配置和测试目录，再按 LoopX 阶段执行。
+```
+
 ## 状态控制器
 
 LoopX 也提供一个本地状态控制器，用于把运行过程从纯提示词约束推进到可校验状态文件：
 
 ```bash
-loopx init "需求描述"
-loopx status
-loopx validate
+python loopx/tools/loopx_controller.py init "需求描述"
+python loopx/tools/loopx_controller.py status
+python loopx/tools/loopx_controller.py validate
 ```
 
-`loopx init` 会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`loopx validate` 会使用内置 schema 校验 run state、worklist 和阶段结果结构；它只依赖 Python 标准库。
+控制器会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`validate` 会使用内置 schema 校验 run state、worklist 和阶段结果结构；它只依赖 Python 标准库。
 
 ## 更新
 
 ```bash
 git pull
-python install.py
-```
-
-## 检查
-
-```bash
-loopx-sync doctor
-loopx-sync version
-```
-
-## 卸载
-
-```bash
-python uninstall.py --yes
-```
-
-Windows 也可以使用：
-
-```bat
-uninstall.cmd --yes
 ```
 
 ## 跨平台约束
 
-LoopX 不依赖 `/data`、`/usr/bin/python3`、`~/.local/bin` 等单一平台路径。同步器会按当前系统生成本机可用的 wrapper、hooks 和用户级安装目录。项目内路径统一使用相对路径，避免把某台机器的绝对路径同步到其它机器。
+LoopX 不依赖 `/data`、`/usr/bin/python3`、`~/.local/bin` 等单一平台路径。skill 内脚本使用相对资源路径，避免把某台机器的绝对路径带到其它机器。
 
 ## 仓库策略
 
