@@ -45,8 +45,12 @@ class LoopxControllerTest(unittest.TestCase):
         self.assertEqual(state["mode"], "LIGHT")
         self.assertEqual(state["risk_tags"], [])
         self.assertEqual(state["current_stage"], "environment_check")
+        self.assertEqual(state["active_agent"], "environment-check-agent")
+        self.assertEqual(state["stage_owners"]["solution_design"], "solution-designer")
+        self.assertEqual(state["repair_tickets"], ".loopx/runs/2026-05-15-controller/repair-tickets")
         self.assertEqual(state["worklist"], ".loopx/runs/2026-05-15-controller/worklist.yml")
         self.assertTrue((run_dir / "worklist.yml").exists())
+        self.assertTrue((run_dir / "repair-tickets").exists())
         self.assertTrue((run_dir / "events.jsonl").exists())
         self.assertIn("created run 2026-05-15-controller", out.getvalue())
 
@@ -332,6 +336,239 @@ items:
         self.assertIn("exception package wrong", review["evidence"])
         self.assertIn("status: CHANGES_REQUIRED", worklist)
         self.assertIn("return_to: solution_design", worklist)
+
+    def test_fail_review_creates_repair_ticket_for_return_stage_owner(self):
+        self.controller.main([
+            "init",
+            "Repair loop",
+            "--run-id",
+            "repair-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "fail-review",
+            "--run-id",
+            "repair-run",
+            "--from",
+            "solution_review",
+            "--return-to",
+            "solution_design",
+            "--item",
+            "W1",
+            "--reason",
+            "ShopLimitExceededException must be in com.crosscomm.admin.exception",
+            "--reason",
+            "GlobalExceptionHandler must remain in controller.handler",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        run_dir = self.tmp / ".loopx" / "runs" / "repair-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        ticket = json.loads((run_dir / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(state["current_stage"], "solution_design")
+        self.assertEqual(state["active_agent"], "solution-designer")
+        self.assertEqual(state["next_action"], "repair_solution_design")
+        self.assertEqual(state["loop_attempts"]["W1"], 1)
+        self.assertEqual(state["stages"]["solution_review"], "CHANGES_REQUIRED")
+        self.assertEqual(ticket["type"], "review_failed")
+        self.assertEqual(ticket["from_stage"], "solution_review")
+        self.assertEqual(ticket["return_to"], "solution_design")
+        self.assertEqual(ticket["assigned_to"], "solution-designer")
+        self.assertEqual(ticket["attempt"], 1)
+        self.assertEqual(ticket["status"], "OPEN")
+        self.assertEqual(ticket["required_changes"], [
+            "ShopLimitExceededException must be in com.crosscomm.admin.exception",
+            "GlobalExceptionHandler must remain in controller.handler",
+        ])
+        self.assertIn("repair_ticket: W1", out.getvalue())
+
+    def test_claim_stage_returns_open_repair_ticket_for_owner_role(self):
+        self.controller.main([
+            "init",
+            "Claim repair",
+            "--run-id",
+            "claim-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        self.controller.main([
+            "fail-review",
+            "--run-id",
+            "claim-run",
+            "--from",
+            "solution_review",
+            "--return-to",
+            "solution_design",
+            "--item",
+            "W1",
+            "--reason",
+            "exception package wrong",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "claim-stage",
+            "solution_design",
+            "--run-id",
+            "claim-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("PASS claimed solution_design", text)
+        self.assertIn("assigned_to: solution-designer", text)
+        self.assertIn("repair_ticket: W1", text)
+        self.assertIn("required_change: exception package wrong", text)
+
+    def test_close_repair_marks_ticket_closed_and_requires_revision(self):
+        self.controller.main([
+            "init",
+            "Close repair",
+            "--run-id",
+            "close-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        self.controller.main([
+            "fail-review",
+            "--run-id",
+            "close-run",
+            "--from",
+            "solution_review",
+            "--return-to",
+            "solution_design",
+            "--item",
+            "W1",
+            "--reason",
+            "exception package wrong",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "close-repair",
+            "--run-id",
+            "close-run",
+            "--item",
+            "W1",
+            "--artifact",
+            "stage-results/03-solution-design.json",
+            "--revision",
+            "2",
+            "--change",
+            "fixed exception package boundary",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        ticket = json.loads((self.tmp / ".loopx" / "runs" / "close-run" / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
+        self.assertEqual(ticket["status"], "CLOSED")
+        self.assertEqual(ticket["artifact"], "stage-results/03-solution-design.json")
+        self.assertEqual(ticket["revision"], 2)
+        self.assertEqual(ticket["changes_from_review"], ["fixed exception package boundary"])
+        self.assertIn("PASS repair closed W1", out.getvalue())
+
+    def test_advance_blocks_until_return_stage_repair_ticket_is_closed(self):
+        self.controller.main([
+            "init",
+            "Repair advance",
+            "--run-id",
+            "repair-advance-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / ".loopx" / "runs" / "repair-advance-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["stages"] = {
+            "environment_check": "PASS",
+            "assignment": "PASS",
+            "solution_design": "PASS",
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        self.controller.main([
+            "fail-review",
+            "--run-id",
+            "repair-advance-run",
+            "--from",
+            "solution_review",
+            "--return-to",
+            "solution_design",
+            "--item",
+            "W1",
+            "--reason",
+            "exception package wrong",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "repair-advance-run",
+            "--to",
+            "solution_review",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("repair ticket W1 must be CLOSED before solution_review", out.getvalue())
+
+        self.controller.main([
+            "close-repair",
+            "--run-id",
+            "repair-advance-run",
+            "--item",
+            "W1",
+            "--artifact",
+            "stage-results/03-solution-design.json",
+            "--revision",
+            "2",
+            "--change",
+            "fixed exception package boundary",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "repair-advance-run",
+            "--stage",
+            "solution_design",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/03-solution-design.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "repair-advance-run",
+            "--to",
+            "solution_review",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        self.assertIn("PASS advanced to solution_review", out.getvalue())
 
 
 if __name__ == "__main__":

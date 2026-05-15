@@ -37,6 +37,20 @@ STAGE_RESULT_FILES = {
     "health_gate": "11-health-gate.json",
     "final_report": "12-final-report.json",
 }
+DEFAULT_STAGE_OWNERS = {
+    "environment_check": "environment-check-agent",
+    "assignment": "project-manager",
+    "solution_design": "solution-designer",
+    "solution_review": "solution-reviewer",
+    "test_design": "test-designer",
+    "test_review": "test-reviewer",
+    "development": "development",
+    "quality_audit": "quality-auditor",
+    "code_review": "code-reviewer",
+    "test_execution": "test-runner",
+    "health_gate": "quality-auditor",
+    "final_report": "release-manager",
+}
 
 class YamlSubsetError(ValueError):
     pass
@@ -110,7 +124,7 @@ def dump_worklist(worklist):
         if key in worklist.get("run", {}):
             lines.append(f"  {key}: {render_yaml_value(worklist['run'][key])}")
     lines.append("items:")
-    for item in worklist.get("items", []):
+    for item in worklist.get("items") or []:
         lines.append(f"  - id: {render_yaml_value(item.get('id', ''))}")
         for key in (
             "title",
@@ -374,6 +388,48 @@ def stage_result_path(directory, stage):
     return directory / "stage-results" / STAGE_RESULT_FILES[stage]
 
 
+def repair_ticket_root(project, run_id, state=None):
+    state = state or load_state(project, run_id)
+    path = Path(state.get("repair_tickets") or f".loopx/runs/{run_id}/repair-tickets")
+    if not path.is_absolute():
+        path = project / path
+    return path
+
+
+def repair_ticket_path(project, run_id, item_id, state=None):
+    return repair_ticket_root(project, run_id, state) / f"{item_id}.json"
+
+
+def read_repair_ticket(project, run_id, item_id, state=None):
+    return read_json(repair_ticket_path(project, run_id, item_id, state))
+
+
+def write_repair_ticket(project, run_id, item_id, ticket, state=None):
+    root = repair_ticket_root(project, run_id, state)
+    root.mkdir(parents=True, exist_ok=True)
+    write_json(root / f"{item_id}.json", ticket)
+
+
+def iter_repair_tickets(project, run_id, state=None):
+    root = repair_ticket_root(project, run_id, state)
+    if not root.exists():
+        return []
+    tickets = []
+    for path in sorted(root.glob("*.json")):
+        try:
+            tickets.append(read_json(path))
+        except ValueError:
+            continue
+    return tickets
+
+
+def open_repair_tickets_for_stage(project, run_id, stage, state=None):
+    return [
+        ticket for ticket in iter_repair_tickets(project, run_id, state)
+        if ticket.get("status") == "OPEN" and ticket.get("return_to") == stage
+    ]
+
+
 def record_stage_result(project, run_id, stage, status, evidence, return_to="", next_action=None, affected_work_items=None, blocked_reason=""):
     directory = get_run_dir(project, run_id)
     state = load_state(project, run_id)
@@ -389,9 +445,12 @@ def record_stage_result(project, run_id, stage, status, evidence, return_to="", 
     }
     write_json(stage_result_path(directory, stage), result)
     state.setdefault("stages", {})[stage] = status
+    state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(stage, stage)
     if status == "CHANGES_REQUIRED":
         target = return_to or stage
         state["current_stage"] = target
+        state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(target, target)
+        state["next_action"] = f"repair_{target}"
         for later_stage in STAGE_SEQUENCE[stage_index(target) + 1:]:
             if later_stage != stage:
                 state["stages"].pop(later_stage, None)
@@ -479,6 +538,7 @@ def cmd_init(args, stdout):
         return 1
     directory.mkdir(parents=True)
     (directory / "stage-results").mkdir()
+    (directory / "repair-tickets").mkdir()
 
     state = {
         "run_id": run_id,
@@ -486,11 +546,16 @@ def cmd_init(args, stdout):
         "mode": mode,
         "status": "ACTIVE",
         "current_stage": "environment_check",
+        "next_action": "assignment",
+        "active_agent": DEFAULT_STAGE_OWNERS["environment_check"],
+        "stage_owners": DEFAULT_STAGE_OWNERS,
         "risk_tags": risk_tags,
         "confirmation_policy": "verification_gated",
         "max_auto_repair": 2,
         "worklist": f".loopx/runs/{run_id}/worklist.yml",
         "events": f".loopx/runs/{run_id}/events.jsonl",
+        "repair_tickets": f".loopx/runs/{run_id}/repair-tickets",
+        "loop_attempts": {},
         "stages": {},
     }
     write_json(directory / "state.json", state)
@@ -559,9 +624,13 @@ def cmd_record_stage(args, stdout):
     return 0
 
 
-def advance_blockers(state, target_stage):
+def advance_blockers(project, run_id, state, target_stage):
     blockers = []
     stages = state.get("stages", {})
+    for ticket in iter_repair_tickets(project, run_id, state):
+        return_to = ticket.get("return_to")
+        if ticket.get("status") == "OPEN" and return_to in STAGES and stage_index(return_to) < stage_index(target_stage):
+            blockers.append(f"repair ticket {ticket.get('item')} must be CLOSED before {target_stage}")
     changed = first_changes_required(stages)
     if changed:
         blockers.append(f"{changed} is {stages[changed]}; return before advancing")
@@ -581,13 +650,15 @@ def cmd_advance(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    blockers = advance_blockers(state, args.to)
+    blockers = advance_blockers(project, run_id, state, args.to)
     if blockers:
         print("FAIL advance blocked", file=stdout)
         for blocker in blockers:
             print(f"- {blocker}", file=stdout)
         return 1
     state["current_stage"] = args.to
+    state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(args.to, args.to)
+    state["next_action"] = default_next_stage(args.to)
     save_state(project, run_id, state)
     append_event(get_run_dir(project, run_id), {"type": "advanced", "to": args.to})
     print(f"PASS advanced to {args.to}", file=stdout)
@@ -632,7 +703,7 @@ def update_worklist_feedback(project, state, item_id, return_to, reason):
         worklist_path, worklist = load_worklist(project, state)
     except (FileNotFoundError, YamlSubsetError):
         return
-    for item in worklist.get("items", []):
+    for item in worklist.get("items") or []:
         if item.get("id") == item_id:
             item["status"] = "CHANGES_REQUIRED"
             item["failed_by"] = "user_feedback"
@@ -645,27 +716,119 @@ def update_worklist_feedback(project, state, item_id, return_to, reason):
     worklist_path.write_text(dump_worklist(worklist), encoding="utf-8")
 
 
+def fail_review(project, run_id, from_stage, return_to, item_id, reasons):
+    state = load_state(project, run_id)
+    owner = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(return_to, return_to)
+    attempts = state.setdefault("loop_attempts", {})
+    attempt = int(attempts.get(item_id, 0)) + 1
+    attempts[item_id] = attempt
+    ticket = {
+        "type": "review_failed",
+        "item": item_id,
+        "from_stage": from_stage,
+        "return_to": return_to,
+        "assigned_to": owner,
+        "attempt": attempt,
+        "status": "OPEN",
+        "required_changes": reasons,
+        "artifact": "",
+        "revision": 0,
+        "changes_from_review": [],
+    }
+    state["current_stage"] = return_to
+    state["next_action"] = f"repair_{return_to}"
+    state["active_agent"] = owner
+    state.setdefault("stages", {})[from_stage] = "CHANGES_REQUIRED"
+    for later_stage in STAGE_SEQUENCE[stage_index(return_to) + 1:]:
+        if later_stage != from_stage:
+            state["stages"].pop(later_stage, None)
+    save_state(project, run_id, state)
+    write_repair_ticket(project, run_id, item_id, ticket, state)
+    for reason in reasons:
+        update_worklist_feedback(project, state, item_id, return_to, reason)
+    record_stage_result(
+        project,
+        run_id,
+        from_stage,
+        "CHANGES_REQUIRED",
+        reasons,
+        return_to=return_to,
+        next_action=f"repair_{return_to}",
+        affected_work_items=[item_id],
+    )
+    return ticket
+
+
+def cmd_fail_review(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        ticket = fail_review(project, run_id, args.from_stage, args.return_to, args.item, args.reason)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    print(f"CHANGES_REQUIRED {args.from_stage}", file=stdout)
+    print(f"repair_ticket: {ticket['item']}", file=stdout)
+    print(f"return_to: {ticket['return_to']}", file=stdout)
+    print(f"assigned_to: {ticket['assigned_to']}", file=stdout)
+    print(f"attempt: {ticket['attempt']}", file=stdout)
+    return 0
+
+
 def cmd_review_feedback(args, stdout):
+    args.from_stage = "solution_review"
+    args.reason = [args.reason]
+    return cmd_fail_review(args, stdout)
+
+
+def cmd_claim_stage(args, stdout):
     project = Path(args.project).resolve()
     try:
         run_id = resolve_run_id(project, args.run_id)
         state = load_state(project, run_id)
-        update_worklist_feedback(project, state, args.item, args.return_to, args.reason)
-        record_stage_result(
-            project,
-            run_id,
-            "solution_review",
-            "CHANGES_REQUIRED",
-            [args.reason],
-            return_to=args.return_to,
-            next_action=args.return_to,
-            affected_work_items=[args.item],
-        )
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    print(f"CHANGES_REQUIRED {args.item}", file=stdout)
-    print(f"return_to: {args.return_to}", file=stdout)
+    if state.get("current_stage") != args.stage:
+        print(f"FAIL current_stage is {state.get('current_stage')}", file=stdout)
+        return 1
+    owner = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(args.stage, args.stage)
+    state["active_agent"] = owner
+    save_state(project, run_id, state)
+    print(f"PASS claimed {args.stage}", file=stdout)
+    print(f"assigned_to: {owner}", file=stdout)
+    for ticket in open_repair_tickets_for_stage(project, run_id, args.stage, state):
+        print(f"repair_ticket: {ticket.get('item')}", file=stdout)
+        print(f"attempt: {ticket.get('attempt')}", file=stdout)
+        for change in ticket.get("required_changes", []):
+            print(f"required_change: {change}", file=stdout)
+    return 0
+
+
+def cmd_close_repair(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        state = load_state(project, run_id)
+        ticket = read_repair_ticket(project, run_id, args.item, state)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    if args.revision < 2:
+        print("FAIL repair revision must be >= 2", file=stdout)
+        return 1
+    ticket["status"] = "CLOSED"
+    ticket["artifact"] = args.artifact
+    ticket["revision"] = args.revision
+    ticket["changes_from_review"] = args.change
+    write_repair_ticket(project, run_id, args.item, ticket, state)
+    from_stage = ticket.get("from_stage")
+    if from_stage:
+        state.setdefault("stages", {}).pop(from_stage, None)
+    save_state(project, run_id, state)
+    print(f"PASS repair closed {args.item}", file=stdout)
+    print(f"artifact: {args.artifact}", file=stdout)
+    print(f"revision: {args.revision}", file=stdout)
     return 0
 
 
@@ -714,6 +877,30 @@ def build_parser():
     can_write.add_argument("--kind", choices=["business", "loopx"], default="business")
     can_write.add_argument("--project", default=".")
     can_write.set_defaults(func=cmd_can_write)
+
+    fail_review_parser = subparsers.add_parser("fail-review", help="Create a review-driven repair ticket and return to the owner stage.")
+    fail_review_parser.add_argument("--run-id")
+    fail_review_parser.add_argument("--from", dest="from_stage", required=True, choices=STAGE_SEQUENCE)
+    fail_review_parser.add_argument("--return-to", required=True, choices=STAGE_SEQUENCE)
+    fail_review_parser.add_argument("--item", required=True)
+    fail_review_parser.add_argument("--reason", action="append", required=True)
+    fail_review_parser.add_argument("--project", default=".")
+    fail_review_parser.set_defaults(func=cmd_fail_review)
+
+    claim = subparsers.add_parser("claim-stage", help="Claim the current stage and show open repair tickets for its owner role.")
+    claim.add_argument("stage", choices=STAGE_SEQUENCE)
+    claim.add_argument("--run-id")
+    claim.add_argument("--project", default=".")
+    claim.set_defaults(func=cmd_claim_stage)
+
+    close = subparsers.add_parser("close-repair", help="Close a repair ticket after updating the original artifact revision.")
+    close.add_argument("--run-id")
+    close.add_argument("--item", required=True)
+    close.add_argument("--artifact", required=True)
+    close.add_argument("--revision", required=True, type=int)
+    close.add_argument("--change", action="append", required=True)
+    close.add_argument("--project", default=".")
+    close.set_defaults(func=cmd_close_repair)
 
     feedback = subparsers.add_parser("review-feedback", help="Record user review feedback and return to a prior stage.")
     feedback.add_argument("--run-id")

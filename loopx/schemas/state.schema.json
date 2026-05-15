@@ -31,6 +31,15 @@
     "current_stage": {
       "type": "string"
     },
+    "next_action": {
+      "type": "string"
+    },
+    "active_agent": {
+      "type": "string"
+    },
+    "stage_owners": {
+      "type": "object"
+    },
     "risk_tags": {
       "type": "array",
       "items": {
@@ -48,6 +57,12 @@
     },
     "events": {
       "type": "string"
+    },
+    "repair_tickets": {
+      "type": "string"
+    },
+    "loop_attempts": {
+      "type": "object"
     },
     "stages": {
       "type": "object"
