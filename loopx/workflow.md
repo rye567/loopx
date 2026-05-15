@@ -127,6 +127,18 @@ stage_result:
 - 是否所有必需验证都有硬证据。
 - 是否所有数据清理都有清理验证。
 
+## Controller 和 Schema
+
+生产化运行优先使用 `loopx` 控制器持久化状态：
+
+```bash
+loopx init "需求描述"
+loopx status
+loopx validate
+```
+
+控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `loopx validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。
+
 ## 本地执行硬约束
 
 - 测试执行前必须确认本地环境缺口；环境缺失导致的失败标记为 `BLOCKED` 或“环境问题”，不得伪装成代码失败。

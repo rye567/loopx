@@ -4,9 +4,12 @@
   "owner": "rye567",
   "description": "LoopX cross-project quality gate kit for Codex and Claude Code.",
   "install": "python install.py",
+  "controllerCommand": "loopx",
   "syncCommand": "loopx-sync",
   "targets": {
     "source": "~/.loopx",
+    "controllerPosix": "~/.local/bin/loopx",
+    "controllerWindows": "%LOCALAPPDATA%\\LoopX\\bin\\loopx.cmd",
     "binPosix": "~/.local/bin/loopx-sync",
     "binWindows": "%LOCALAPPDATA%\\LoopX\\bin\\loopx-sync.cmd",
     "codexSkill": "~/.codex/skills/loopx",

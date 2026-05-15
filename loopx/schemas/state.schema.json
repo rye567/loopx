@@ -1,0 +1,49 @@
+{
+  "type": "object",
+  "required": [
+    "run_id",
+    "requirement",
+    "mode",
+    "status",
+    "current_stage",
+    "confirmation_policy",
+    "max_auto_repair",
+    "worklist",
+    "events",
+    "stages"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "requirement": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["LIGHT", "STANDARD", "FULL"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ACTIVE", "PASS", "BLOCKED", "LOCAL_INCOMPLETE_CI_REQUIRED"]
+    },
+    "current_stage": {
+      "type": "string"
+    },
+    "confirmation_policy": {
+      "type": "string"
+    },
+    "max_auto_repair": {
+      "type": "integer"
+    },
+    "worklist": {
+      "type": "string"
+    },
+    "events": {
+      "type": "string"
+    },
+    "stages": {
+      "type": "object"
+    }
+  }
+}

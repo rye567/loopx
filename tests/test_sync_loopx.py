@@ -84,6 +84,14 @@ class SyncLoopxTest(unittest.TestCase):
         self.assertTrue((self.tmp / "assets" / "config" / "risk.yml").exists())
         self.assertTrue((self.tmp / "assets" / "config" / "project-profiles.yml").exists())
 
+    def test_copy_schemas_includes_controller_contracts(self):
+        self.sync.copy_schemas(self.tmp, "assets/schemas")
+
+        self.assertTrue((self.tmp / "assets" / "schemas" / "state.schema.json").exists())
+        self.assertTrue((self.tmp / "assets" / "schemas" / "stage-result.schema.json").exists())
+        self.assertTrue((self.tmp / "assets" / "schemas" / "worklist.schema.json").exists())
+        self.assertTrue((self.tmp / "assets" / "schemas" / "health-result.schema.json").exists())
+
     def test_permissions_drive_generated_adapters(self):
         settings = json.loads(self.sync.claude_settings_json())
         self.assertIn("Bash(mvn compile)", settings["permissions"]["allow"])
@@ -122,7 +130,11 @@ class SyncLoopxTest(unittest.TestCase):
         self.assertTrue((self.tmp / "bin" / "loopx-sync").exists())
         self.assertTrue((self.tmp / "bin" / "loopx-sync.cmd").exists())
         self.assertTrue((self.tmp / "bin" / "loopx-sync.ps1").exists())
+        self.assertTrue((self.tmp / "bin" / "loopx").exists())
+        self.assertTrue((self.tmp / "bin" / "loopx.cmd").exists())
+        self.assertTrue((self.tmp / "bin" / "loopx.ps1").exists())
         self.assertIn(sys.executable, (self.tmp / "bin" / "loopx-sync").read_text(encoding="utf-8"))
+        self.assertIn("loopx_controller.py", (self.tmp / "bin" / "loopx").read_text(encoding="utf-8"))
 
     def test_risk_policy_is_declared_in_workflow_and_assignment_agent(self):
         workflow = (ROOT / "loopx" / "workflow.md").read_text(encoding="utf-8")

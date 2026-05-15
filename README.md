@@ -27,6 +27,8 @@ bash install.sh
 安装后会写入：
 
 - `~/.loopx`
+- macOS/Linux：`~/.local/bin/loopx`
+- Windows：`%LOCALAPPDATA%\LoopX\bin\loopx.cmd` 和 `loopx.ps1`
 - macOS/Linux：`~/.local/bin/loopx-sync`
 - Windows：`%LOCALAPPDATA%\LoopX\bin\loopx-sync.cmd` 和 `loopx-sync.ps1`
 - `~/.codex/skills/loopx`
@@ -61,6 +63,18 @@ $loopx 处理需求：...
 ```text
 /loopx 处理需求：...
 ```
+
+## 状态控制器
+
+LoopX 也提供一个本地状态控制器，用于把运行过程从纯提示词约束推进到可校验状态文件：
+
+```bash
+loopx init "需求描述"
+loopx status
+loopx validate
+```
+
+`loopx init` 会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`loopx validate` 会使用内置 schema 校验 run state、worklist 和阶段结果结构；它只依赖 Python 标准库。
 
 ## 更新
 
