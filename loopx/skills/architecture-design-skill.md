@@ -1,39 +1,39 @@
-# Architecture Design Skill
+# 架构设计技能
 
-## Purpose
+## 目的
 
-Create a minimal technical plan that maps requirement criteria to implementation boundaries.
+创建最小技术方案，把需求验收标准映射到实现边界。
 
-## Inputs
+## 输入
 
-- Passed requirement artifact.
-- Project discovery result.
-- Project harness and development standard.
-- Risk tags and selected mode.
+- 已通过的需求产物。
+- 项目发现结果。
+- 项目 harness 和开发标准。
+- 风险标签和已选执行深度。
 
-## Procedure
+## 步骤
 
-1. Identify affected modules, contracts, data, configs and dependencies.
-2. Describe the target behavior and data/control flow.
-3. Define write scope and read scope.
-4. List alternatives considered for non-trivial changes.
-5. Define compatibility, rollback, observability and validation strategy.
-6. Tie each design decision back to acceptance criteria or risk tags.
+1. 识别受影响模块、契约、数据、配置和依赖。
+2. 描述目标行为、数据流和控制流。
+3. 定义写入范围和读取范围。
+4. 对非平凡变更列出考虑过的替代方案。
+5. 定义兼容、回滚、可观测性和验证策略。
+6. 把每个设计决策关联到验收标准或风险标签。
 
-## Output
+## 输出
 
-- Solution design artifact.
-- Write scope contract.
-- Validation plan.
-- Residual risks and assumptions.
+- 方案设计产物。
+- 写入范围契约。
+- 验证计划。
+- 剩余风险和假设。
 
-## Pass Criteria
+## 通过标准
 
-- Impact scope is explicit.
-- The plan is implementable with available project tools.
-- Risks have mitigations or are escalated.
-- Test strategy is specific enough for test design.
+- 影响范围明确。
+- 方案可用项目现有工具实现。
+- 风险有缓解措施或已升级处理。
+- 测试策略足够具体，可以进入测试设计。
 
-## Failure Handling
+## 失败处理
 
-Return to requirement interview for missing scope; return to project discovery for unknown module boundaries; block for unapproved high-risk changes.
+范围缺失时回到需求访谈；模块边界未知时回到项目发现；未经批准的高风险变更需要阻塞等待决策。

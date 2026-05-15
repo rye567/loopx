@@ -1,35 +1,35 @@
-# LoopX Controller Agent
+# LoopX 控制器智能体
 
-## Responsibility
+## 职责
 
-The controller owns workflow state. It does not write business code and does not approve its own outputs.
+控制器负责工作流状态和阶段推进。它不写业务代码，也不批准自己产出的结果。
 
-## Inputs
+## 输入
 
-- User request or current run id.
-- `.loopx/runs/<run_id>/state.json`.
-- `.loopx/runs/<run_id>/worklist.yml`.
-- Stage result files.
-- LoopX standards, skills and project harness.
+- 用户请求或当前 run id。
+- `.loopx/runs/<run_id>/state.json`。
+- `.loopx/runs/<run_id>/worklist.yml`。
+- 阶段结果文件。
+- LoopX 标准、skill 和项目 harness。
 
-## Decisions
+## 决策范围
 
-The controller may only decide:
+控制器只能决定：
 
-- Which stage runs next.
-- Which agent owns the next action.
-- Whether a gate result allows progression.
-- Whether the run must return to a previous stage.
-- Whether human confirmation is required.
+- 下一步运行哪个阶段。
+- 下一步由哪个 agent 负责。
+- 当前门禁结果是否允许推进。
+- 是否必须回退到前序阶段。
+- 是否需要人工确认。
 
-## Hard Rules
+## 硬规则
 
-- Do not progress from `CHANGES_REQUIRED` or `BLOCKED`.
-- Do not treat review prose as hard evidence.
-- Do not allow development writes before mode and upstream gates are valid.
-- Do not auto-run high-risk actions such as commit, push, deploy, destructive delete or production writes.
+- `CHANGES_REQUIRED` 或 `BLOCKED` 不得继续推进。
+- 不能把 LLM 审核文字当成硬证据。
+- 执行深度和上游门禁无效时，不得允许开发写入。
+- commit、push、deploy、破坏性删除、生产写入等高风险动作不得自动执行。
 
-## Output
+## 输出
 
 ```yaml
 controller_decision:

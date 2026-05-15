@@ -1,29 +1,29 @@
-# Development Standard
+# 开发标准
 
-## Purpose
+## 目的
 
-Keep implementation minimal, reviewable and aligned with approved requirements and design.
+保持实现最小、可审查，并与已批准需求和方案一致。
 
-## Required Inputs
+## 必需输入
 
-- Passed requirement artifact.
-- Passed design artifact or explicit `LIGHT` plan.
-- Passed test design artifact, unless the run is explicitly `LIGHT` and the skipped gate is documented.
-- Project harness, module discovery and write scope.
+- 已通过的需求产物。
+- 已通过的方案产物，或明确的 `LIGHT` 计划。
+- 已通过的测试设计产物；如果是明确 `LIGHT`，必须记录被跳过的门禁。
+- 项目 harness、模块发现结果和写入范围。
 
-## Implementation Rules
+## 实现规则
 
-- Make the smallest change that satisfies the accepted scope.
-- Preserve existing user changes; never revert unrelated work without approval.
-- Respect module boundaries, API contracts and project-specific style.
-- Do not introduce new frameworks, services or broad refactors without a design gate.
-- Do not weaken assertions, delete tests, swallow exceptions or hide failures to pass a gate.
-- Keep secrets, tenant ids, production endpoints and credentials out of code and logs.
-- Prefer explicit error handling and observable failure signals over silent fallback.
+- 只做满足已接受范围的最小变更。
+- 保留已有用户改动；未经批准不得回滚无关工作。
+- 遵守模块边界、API 契约和项目本地风格。
+- 未经过设计门禁，不引入新框架、新服务或大范围重构。
+- 不为通过门禁而削弱断言、删除测试、吞异常或隐藏失败。
+- 密钥、租户 id、生产端点和凭据不得进入代码或日志。
+- 优先使用显式错误处理和可观察失败信号，不做静默降级。
 
-## Write Scope Contract
+## 写入范围契约
 
-Every development task must declare:
+每个开发任务必须声明：
 
 ```yaml
 write_scope:
@@ -33,23 +33,23 @@ write_scope:
   concurrency_conflicts: []
 ```
 
-If the required change exceeds `allowed_paths`, the agent must stop and return to design or project assignment.
+如果所需变更超出 `allowed_paths`，智能体必须停止并返回方案设计或项目分配。
 
-## Pass Criteria
+## 通过标准
 
-- Diff is limited to the approved scope.
-- Implementation maps to acceptance criteria and worklist items.
-- Tests are added or updated for changed behavior.
-- Validation commands are run or marked as environment-blocked with evidence.
-- Remaining risks are explicit and not hidden in generic language.
+- Diff 限定在已批准范围内。
+- 实现映射到验收标准和 worklist item。
+- 已为变更行为新增或更新测试。
+- 已运行验证命令，或带证据标记为环境阻塞。
+- 剩余风险明确，不隐藏在泛泛表述里。
 
-## Fail / Return Rules
+## 失败 / 返回规则
 
-- Scope expansion: return to solution design.
-- Missing tests: return to development or test design, based on cause.
-- Build/test failure: stay in development unless the evidence shows environment blockage.
-- Unknown module boundary: return to project assignment.
+- 范围扩大：返回方案设计。
+- 测试缺失：按原因返回开发或测试设计。
+- 构建/测试失败：留在开发，除非证据表明是环境阻塞。
+- 模块边界未知：返回项目分配。
 
-## Evidence
+## 证据
 
-Record changed files, commands run, command outputs or failure summaries, and mapping from acceptance criteria to code/test changes.
+记录变更文件、已运行命令、命令输出或失败摘要，以及验收标准到代码/测试变更的映射。

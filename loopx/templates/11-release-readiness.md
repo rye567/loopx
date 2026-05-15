@@ -1,6 +1,6 @@
-# 11 Release Readiness
+# 11 发布就绪
 
-## Release Identity
+## 发布标识
 
 ```yaml
 release:
@@ -9,13 +9,13 @@ release:
   risk_level: LIGHT|STANDARD|FULL
 ```
 
-## Change Summary
+## 变更摘要
 
-- Changed files:
-- Behavior changed:
-- User impact:
+- 变更文件：
+- 行为变化：
+- 用户影响：
 
-## Operational Impact
+## 运行影响
 
 ```yaml
 config_changes: []
@@ -25,7 +25,7 @@ external_dependencies: []
 compatibility_notes: []
 ```
 
-## Validation Coverage
+## 验证覆盖
 
 ```yaml
 local_validation: []
@@ -34,11 +34,11 @@ manual_validation: []
 not_covered: []
 ```
 
-## Rollback Plan
+## 回滚计划
 
 -
 
-## Monitoring / Observation
+## 监控 / 观测
 
 ```yaml
 metrics: []
@@ -47,11 +47,11 @@ alerts: []
 post_release_checks: []
 ```
 
-## Residual Risks
+## 剩余风险
 
 -
 
-## Stage Result
+## 阶段结果
 
 ```yaml
 stage_result:

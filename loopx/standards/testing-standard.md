@@ -1,19 +1,19 @@
-# Testing Standard
+# 测试标准
 
-## Purpose
+## 目的
 
-Make testing executable, reproducible and tied to acceptance criteria.
+让测试可执行、可复现，并与验收标准绑定。
 
-## Required Inputs
+## 必需输入
 
-- Requirement artifact with acceptance criteria.
-- Design artifact with interfaces, data flow and risks.
-- Project profile with available validation commands.
-- Environment limits and dependency availability.
+- 带验收标准的需求产物。
+- 带接口、数据流和风险的方案产物。
+- 带可用验证命令的项目 profile。
+- 环境限制和依赖可用性。
 
-## Test Case Contract
+## 测试用例契约
 
-Each test case must include:
+每个测试用例必须包含：
 
 ```yaml
 id: TC-001
@@ -33,30 +33,30 @@ cleanup:
 expected_result: ""
 ```
 
-## Required Coverage
+## 必需覆盖
 
-- Happy path.
-- Boundary values.
-- Invalid input and failure path.
-- Permission, tenant or ownership checks when relevant.
-- Regression checks around changed contracts.
-- Cleanup verification for created test data.
+- 正常路径。
+- 边界值。
+- 非法输入和失败路径。
+- 相关时覆盖权限、租户或归属检查。
+- 变更契约周边的回归检查。
+- 为测试创建的数据提供清理验证。
 
-## Pass Criteria
+## 通过标准
 
-- Every acceptance criterion maps to one or more test cases.
-- Tests include data setup, execution entrypoint, assertions, cleanup and cleanup verification.
-- Environment gaps are separated from product failures.
-- Manual verification is marked as manual and not counted as automated proof.
-- CI-only checks are explicitly marked `CI_REQUIRED`.
+- 每条验收标准映射到一个或多个测试用例。
+- 测试包含数据准备、执行入口、断言、清理和清理验证。
+- 环境缺口与产品失败分离。
+- 人工验证标记为人工，不能算作自动化证据。
+- 只在 CI 覆盖的检查明确标记 `CI_REQUIRED`。
 
-## Fail / Return Rules
+## 失败 / 返回规则
 
-- Missing acceptance criterion mapping: return to test design.
-- Missing cleanup verification: return to test design.
-- Test cannot run due environment: mark `BLOCKED` or `CI_REQUIRED`, not `PASS`.
-- Product defect discovered: return to development.
+- 验收标准映射缺失：返回测试设计。
+- 清理验证缺失：返回测试设计。
+- 测试因环境不可运行：标记 `BLOCKED` 或 `CI_REQUIRED`，不得标记 `PASS`。
+- 发现产品缺陷：返回开发。
 
-## Evidence
+## 证据
 
-Record test case file, executed commands, result status, relevant output summary and cleanup verification result.
+记录测试用例文件、执行命令、结果状态、相关输出摘要和清理验证结果。

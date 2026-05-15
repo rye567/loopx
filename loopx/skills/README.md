@@ -1,15 +1,15 @@
-# LoopX Skills
+# LoopX 技能
 
-LoopX skills are small reusable capabilities. Agents compose these skills; gates verify their outputs.
+LoopX 技能是小而可复用的能力单元。智能体组合这些技能，门禁验证它们的输出。
 
-A skill must define:
+每个技能必须定义：
 
-- Purpose.
-- Inputs.
-- Procedure.
-- Outputs.
-- Pass criteria.
-- Failure handling.
-- Evidence expected by the harness.
+- 目的。
+- 输入。
+- 步骤。
+- 输出。
+- 通过标准。
+- 失败处理。
+- harness 期望的证据。
 
-Keep skills narrow. Do not create a single all-purpose development skill when a smaller requirement, design, test, review or release skill would be easier to verify.
+保持技能窄而清晰。不要把需求、设计、测试、审查和发布都塞进一个万能开发技能。

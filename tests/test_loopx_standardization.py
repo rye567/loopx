@@ -28,21 +28,21 @@ class LoopXStandardizationTest(unittest.TestCase):
         base = ROOT / "loopx" / "standards"
         for name in self.check.REQUIRED_STANDARDS:
             with self.subTest(name=name):
-                text = (base / name).read_text(encoding="utf-8").lower()
-                self.assertIn("pass criteria", text)
-                self.assertTrue("fail" in text or "return rules" in text)
-                self.assertIn("evidence", text)
+                text = (base / name).read_text(encoding="utf-8")
+                self.assertIn("通过标准", text)
+                self.assertTrue("失败" in text or "返回规则" in text)
+                self.assertIn("证据", text)
 
     def test_required_skills_are_small_contracts(self):
         base = ROOT / "loopx" / "skills"
         for name in self.check.REQUIRED_SKILLS:
             with self.subTest(name=name):
-                text = (base / name).read_text(encoding="utf-8").lower()
-                self.assertIn("purpose", text)
-                self.assertIn("inputs", text)
-                self.assertIn("output", text)
-                self.assertIn("pass criteria", text)
-                self.assertIn("failure", text)
+                text = (base / name).read_text(encoding="utf-8")
+                self.assertIn("目的", text)
+                self.assertIn("输入", text)
+                self.assertIn("输出", text)
+                self.assertIn("通过标准", text)
+                self.assertIn("失败处理", text)
 
 
 if __name__ == "__main__":

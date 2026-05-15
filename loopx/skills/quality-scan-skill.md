@@ -1,39 +1,39 @@
-# Quality Scan Skill
+# 质量扫描技能
 
-## Purpose
+## 目的
 
-Convert review expectations into objective checks that can stop unsafe progression.
+把审查期望转成能阻止不安全推进的客观检查。
 
-## Inputs
+## 输入
 
-- Stage artifacts.
-- Worklist.
-- Changed files or planned write scope.
-- Test and validation evidence.
-- Quality standard and project harness.
+- 阶段产物。
+- Worklist。
+- 已变更文件或计划写入范围。
+- 测试和验证证据。
+- 质量标准和项目 harness。
 
-## Procedure
+## 步骤
 
-1. Verify required artifacts for the selected mode.
-2. Verify stage results use allowed statuses and return targets.
-3. Verify worklist items are resolved, blocked or accepted by the user.
-4. Compare diff against write scope.
-5. Check evidence for build/test/cleanup/CI gaps.
-6. Flag forbidden implementation patterns and missing proof.
+1. 验证所选执行深度要求的产物是否存在。
+2. 验证阶段结果使用合法状态和返回目标。
+3. 验证 worklist item 已解决、阻塞或被用户接受风险。
+4. 对照写入范围检查 diff。
+5. 检查 build、test、cleanup、CI 缺口证据。
+6. 标记禁止的实现模式和缺失证据。
 
-## Output
+## 输出
 
-- Quality report.
-- Gate result.
-- Required actions with `return_to` target.
+- 质量报告。
+- 门禁结果。
+- 带 `return_to` 目标的 required actions。
 
-## Pass Criteria
+## 通过标准
 
-- Required evidence exists.
-- No unresolved worklist item is hidden.
-- No required local validation is missing.
-- CI gaps are declared.
+- 必需证据存在。
+- 没有隐藏未解决的 worklist item。
+- 没有缺失的必需本地验证。
+- CI 缺口已声明。
 
-## Failure Handling
+## 失败处理
 
-Return to the owning stage: requirement, design, test design, development, test execution or Health Gate.
+返回责任阶段：需求、设计、测试设计、开发、测试执行或 Health Gate。

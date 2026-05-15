@@ -1,37 +1,37 @@
-# Release Check Skill
+# 发布检查技能
 
-## Purpose
+## 目的
 
-Prepare release evidence without performing unsafe publishing actions automatically.
+准备发布证据，但不自动执行不安全的发布动作。
 
-## Inputs
+## 输入
 
-- Passed quality report.
-- Test report.
-- Changed file summary.
-- Release standard.
-- Project deployment or CI conventions when available.
+- 已通过的质量报告。
+- 测试报告。
+- 变更文件摘要。
+- 发布标准。
+- 项目的部署或 CI 约定。
 
-## Procedure
+## 步骤
 
-1. Identify config, database, compatibility and external dependency changes.
-2. Define deploy and rollback steps.
-3. Define monitoring and observation points.
-4. Separate local validation, CI-required validation and manual verification.
-5. Require human approval for commit, push, deployment or production-impacting actions.
+1. 识别配置、数据库、兼容性和外部依赖变化。
+2. 定义部署和回滚步骤。
+3. 定义监控和观测点。
+4. 区分本地验证、CI 必需验证和人工验证。
+5. commit、push、部署或生产影响动作必须要求人工批准。
 
-## Output
+## 输出
 
-- Release readiness artifact.
-- Residual risk list.
-- Human approval requirement.
+- 发布就绪产物。
+- 剩余风险列表。
+- 人工批准要求。
 
-## Pass Criteria
+## 通过标准
 
-- Rollback and observation are defined or not applicable with reason.
-- Validation gaps are not hidden.
-- Release actions do not execute without explicit approval.
+- 回滚和观测已定义，或说明不适用原因。
+- 验证缺口没有被隐藏。
+- 发布动作不会在未明确批准时执行。
 
-## Failure Handling
+## 失败处理
 
-Return to solution design for missing impact analysis, test execution for missing evidence, or block for human decision.
+影响分析缺失时返回方案设计；证据缺失时返回测试执行；需要人工决策时阻塞。

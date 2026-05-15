@@ -1,17 +1,17 @@
-# Release Standard
+# 发布标准
 
-## Purpose
+## 目的
 
-Ensure finished work can be safely shipped, rolled back and observed.
+确保完成的工作可以安全发布、回滚和观测。
 
-## Required Inputs
+## 必需输入
 
-- Passed quality gate.
-- Passed test execution or documented CI requirement.
-- Final diff summary.
-- Known environment, config, data and operational impacts.
+- 已通过的质量门禁。
+- 已通过的测试执行，或记录清楚的 CI 要求。
+- 最终 diff 摘要。
+- 已知环境、配置、数据和运行影响。
 
-## Release Readiness Contract
+## 发布就绪契约
 
 ```yaml
 release:
@@ -35,17 +35,17 @@ release:
   residual_risks: []
 ```
 
-## Pass Criteria
+## 通过标准
 
-- Rollback path is defined or explicitly not applicable.
-- Config, database and compatibility impacts are declared.
-- Monitoring or observation points are listed for non-trivial changes.
-- Local versus CI coverage is clearly separated.
-- Human approval is required for release, push or production-impacting steps.
+- 回滚路径已定义，或明确说明不适用。
+- 配置、数据库和兼容性影响已声明。
+- 非平凡变更列出监控或观测点。
+- 本地覆盖与 CI 覆盖清晰分离。
+- 发布、push 或生产影响步骤需要人工批准。
 
-## Fail / Return Rules
+## 失败 / 返回规则
 
-- No rollback plan for risky change: return to release planning.
-- Undeclared config/data impact: return to solution design.
-- Missing validation evidence: return to test execution or Health Gate.
-- Unaccepted residual risk: block for human decision.
+- 高风险变更没有回滚计划：返回发布规划。
+- 配置/数据影响未声明：返回方案设计。
+- 验证证据缺失：返回测试执行或 Health Gate。
+- 剩余风险未被接受：阻塞等待人工决策。

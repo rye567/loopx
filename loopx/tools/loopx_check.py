@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""LoopX local harness checks.
+"""LoopX 本地 harness 检查。
 
-This tool intentionally uses only the Python standard library. It supports two
-modes:
+本工具只依赖 Python 标准库，支持两种模式：
 
-- kit: validate that the LoopX kit contains standardization assets.
-- project: validate a target project's local LoopX run structure and evidence.
+- kit：检查 LoopX kit 是否包含标准化资产。
+- project：检查目标项目的本地 LoopX run 结构和证据。
 """
 
 from __future__ import annotations
@@ -102,15 +101,15 @@ def check_required_files(root: Path, label: str, relative_dir: str, names: list[
     missing = [name for name in names if not (base / name).exists()]
     if missing:
         return CheckResult(
-            name=f"required_{label}",
+            name=f"必需_{label}",
             status=BLOCKED,
-            message=f"Missing required {label}: {', '.join(missing)}",
+            message=f"缺少必需 {label}: {', '.join(missing)}",
             evidence=existing(base / name for name in names),
         )
     return CheckResult(
-        name=f"required_{label}",
+        name=f"必需_{label}",
         status=PASS,
-        message=f"All required {label} are present.",
+        message=f"所有必需 {label} 均存在。",
         evidence=[str(base / name) for name in names],
     )
 
@@ -124,22 +123,22 @@ def file_contains_all(path: Path, required_terms: list[str]) -> bool:
 def check_skill_contracts(root: Path) -> CheckResult:
     base = root / "loopx" / "skills"
     missing_contract = []
-    required_terms = ["purpose", "inputs", "procedure", "output", "pass criteria", "failure"]
+    required_terms = ["目的", "输入", "步骤", "输出", "通过标准", "失败处理"]
     for name in REQUIRED_SKILLS:
         path = base / name
         if path.exists() and not file_contains_all(path, required_terms):
             missing_contract.append(name)
     if missing_contract:
         return CheckResult(
-            name="skill_contracts",
+            name="技能契约",
             status=BLOCKED,
-            message="Some skills do not declare the full contract.",
+            message="部分技能未声明完整契约。",
             evidence=missing_contract,
         )
     return CheckResult(
-        name="skill_contracts",
+        name="技能契约",
         status=PASS,
-        message="All required skills declare input/output/gate contracts.",
+        message="所有必需技能均声明输入、输出和门禁契约。",
         evidence=[str(base / name) for name in REQUIRED_SKILLS if (base / name).exists()],
     )
 
@@ -147,11 +146,11 @@ def check_skill_contracts(root: Path) -> CheckResult:
 def evaluate_kit(root: Path) -> HarnessReport:
     root = root.resolve()
     checks = [
-        check_required_files(root, "standards", "loopx/standards", REQUIRED_STANDARDS),
-        check_required_files(root, "skills", "loopx/skills", REQUIRED_SKILLS),
-        check_required_files(root, "agent_docs", "loopx/agents", REQUIRED_AGENT_DOCS),
-        check_required_files(root, "templates", "loopx/templates", REQUIRED_TEMPLATES),
-        check_required_files(root, "schemas", "loopx/schemas", REQUIRED_SCHEMAS),
+        check_required_files(root, "标准", "loopx/standards", REQUIRED_STANDARDS),
+        check_required_files(root, "技能", "loopx/skills", REQUIRED_SKILLS),
+        check_required_files(root, "智能体文档", "loopx/agents", REQUIRED_AGENT_DOCS),
+        check_required_files(root, "模板", "loopx/templates", REQUIRED_TEMPLATES),
+        check_required_files(root, "结构契约", "loopx/schemas", REQUIRED_SCHEMAS),
         check_skill_contracts(root),
     ]
     status = BLOCKED if any(check.status == BLOCKED for check in checks) else PASS
@@ -162,9 +161,9 @@ def load_json(path: Path) -> tuple[dict | None, str | None]:
     try:
         return json.loads(path.read_text(encoding="utf-8")), None
     except FileNotFoundError:
-        return None, f"{path} does not exist"
+        return None, f"{path} 不存在"
     except json.JSONDecodeError as exc:
-        return None, f"{path} is not valid JSON: {exc}"
+        return None, f"{path} 不是合法 JSON: {exc}"
 
 
 def find_latest_run(root: Path) -> Path | None:
@@ -183,7 +182,7 @@ def check_project_run(root: Path) -> CheckResult:
         return CheckResult(
             name="loopx_run_state",
             status=PASS_WITH_WARNINGS,
-            message="No .loopx run found; project has not created a local LoopX run yet.",
+            message="未发现 .loopx run；项目尚未创建本地 LoopX run。",
             evidence=[],
         )
     state, error = load_json(latest / "state.json")
@@ -195,13 +194,13 @@ def check_project_run(root: Path) -> CheckResult:
         return CheckResult(
             name="loopx_run_state",
             status=BLOCKED,
-            message=f"Latest run state is missing required fields: {', '.join(missing)}",
+            message=f"最新 run state 缺少必需字段: {', '.join(missing)}",
             evidence=[str(latest / "state.json")],
         )
     return CheckResult(
         name="loopx_run_state",
         status=PASS,
-        message=f"Latest run state is readable: {state.get('run_id')}",
+        message=f"最新 run state 可读取: {state.get('run_id')}",
         evidence=[str(latest / "state.json")],
     )
 
@@ -209,13 +208,13 @@ def check_project_run(root: Path) -> CheckResult:
 def check_project_stage_results(root: Path) -> CheckResult:
     latest = find_latest_run(root)
     if latest is None:
-        return CheckResult("stage_results", PASS_WITH_WARNINGS, "No run stage results found yet.", [])
+        return CheckResult("stage_results", PASS_WITH_WARNINGS, "尚未发现 run 阶段结果。", [])
     stage_dir = latest / "stage-results"
     if not stage_dir.exists():
-        return CheckResult("stage_results", BLOCKED, "stage-results directory is missing.", [str(latest)])
+        return CheckResult("stage_results", BLOCKED, "缺少 stage-results 目录。", [str(latest)])
     result_files = sorted(stage_dir.glob("*.json"))
     if not result_files:
-        return CheckResult("stage_results", PASS_WITH_WARNINGS, "No stage result files have been written yet.", [str(stage_dir)])
+        return CheckResult("stage_results", PASS_WITH_WARNINGS, "尚未写入阶段结果文件。", [str(stage_dir)])
     invalid = []
     for path in result_files:
         data, error = load_json(path)
@@ -224,10 +223,10 @@ def check_project_stage_results(root: Path) -> CheckResult:
             continue
         for key in ["stage", "status", "return_to", "next_action", "affected_work_items", "evidence"]:
             if key not in data:
-                invalid.append(f"{path.name} missing {key}")
+                invalid.append(f"{path.name} 缺少 {key}")
     if invalid:
-        return CheckResult("stage_results", BLOCKED, "Invalid stage result files.", invalid)
-    return CheckResult("stage_results", PASS, "Stage result files are structurally readable.", [str(path) for path in result_files])
+        return CheckResult("stage_results", BLOCKED, "阶段结果文件结构无效。", invalid)
+    return CheckResult("stage_results", PASS, "阶段结果文件结构可读取。", [str(path) for path in result_files])
 
 
 def iter_source_files(root: Path) -> Iterable[Path]:
@@ -250,18 +249,18 @@ def check_forbidden_patterns(root: Path) -> CheckResult:
             if pattern.search(text):
                 findings.append(f"{path}: {label}")
     if findings:
-        return CheckResult("forbidden_patterns", BLOCKED, "Forbidden source patterns found.", findings[:50])
-    return CheckResult("forbidden_patterns", PASS, "No forbidden source patterns found.", [])
+        return CheckResult("forbidden_patterns", BLOCKED, "发现禁止的源码模式。", findings[:50])
+    return CheckResult("forbidden_patterns", PASS, "未发现禁止的源码模式。", [])
 
 
 def check_ci_gap(root: Path) -> CheckResult:
     workflow_dir = root / ".github" / "workflows"
     if workflow_dir.exists() and any(workflow_dir.glob("*.yml")):
-        return CheckResult("ci_gap", PASS, "CI workflow files detected.", [str(path) for path in workflow_dir.glob("*.yml")])
+        return CheckResult("ci_gap", PASS, "检测到 CI workflow 文件。", [str(path) for path in workflow_dir.glob("*.yml")])
     return CheckResult(
         "ci_gap",
         LOCAL_INCOMPLETE_CI_REQUIRED,
-        "No GitHub Actions workflow detected; final report must declare CI/remote gap.",
+        "未检测到 GitHub Actions workflow；最终报告必须声明 CI/远端缺口。",
         [],
     )
 

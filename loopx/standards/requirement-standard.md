@@ -1,55 +1,55 @@
-# Requirement Standard
+# 需求标准
 
-## Purpose
+## 目的
 
-Make every user request executable before design, code or test work begins.
+在方案、代码或测试开始前，让每个用户请求都变成可执行需求。
 
-## Required Inputs
+## 必需输入
 
-- User request or issue description.
-- Target project and module, if known.
-- Known business goal, user role or workflow.
-- Constraints, deadlines, dependencies or non-goals already stated by the user.
+- 用户请求或 issue 描述。
+- 目标项目和模块，如果已知。
+- 已知业务目标、用户角色或流程。
+- 用户已声明的约束、期限、依赖或非目标。
 
-## Required Output
+## 必需输出
 
-A requirement artifact must include:
+需求产物必须包含：
 
-| Field | Requirement |
+| 字段 | 要求 |
 | --- | --- |
-| `id` | Stable requirement id, for example `REQ-20260515-001`. |
-| `title` | Short action-oriented title. |
-| `background` | Why this change is needed. |
-| `users` | Who uses or is affected by it. |
-| `problem` | Current pain, defect or missing capability. |
-| `goals` | Desired observable outcomes. |
-| `in_scope` | What will be changed. |
-| `out_of_scope` | What will not be changed. |
-| `acceptance_criteria` | Verifiable criteria written as observable behavior. |
-| `edge_cases` | Boundary, empty, invalid, concurrency or permission cases. |
-| `non_functional_requirements` | Performance, security, compatibility, observability and reliability needs. |
-| `risks` | Requirement ambiguity, data, security, integration and release risks. |
-| `dependencies` | Systems, teams, configs, data or tools needed. |
-| `open_questions` | Anything that must be clarified before the next gate. |
+| `id` | 稳定需求 id，例如 `REQ-20260515-001`。 |
+| `title` | 简短、动作导向的标题。 |
+| `background` | 为什么需要这个变更。 |
+| `users` | 谁使用或受影响。 |
+| `problem` | 当前痛点、缺陷或缺失能力。 |
+| `goals` | 期望的可观察结果。 |
+| `in_scope` | 将会变更什么。 |
+| `out_of_scope` | 不会变更什么。 |
+| `acceptance_criteria` | 写成可观察行为的可验证标准。 |
+| `edge_cases` | 边界、空值、非法输入、并发或权限场景。 |
+| `non_functional_requirements` | 性能、安全、兼容、可观测性和可靠性需求。 |
+| `risks` | 需求歧义、数据、安全、集成和发布风险。 |
+| `dependencies` | 需要的系统、团队、配置、数据或工具。 |
+| `open_questions` | 进入下一门禁前必须澄清的问题。 |
 
-## Pass Criteria
+## 通过标准
 
-A requirement gate can pass only when:
+需求门禁只有在以下条件满足时才能通过：
 
-- Acceptance criteria are testable without interpreting intent.
-- Scope and non-scope are both explicit.
-- The affected user or workflow is named.
-- Edge cases and failure paths are listed or intentionally marked not applicable.
-- Open questions are empty, non-blocking, or assigned to `NEED_HUMAN`.
-- Risk tags are available for mode selection: `LIGHT`, `STANDARD` or `FULL`.
+- 验收标准无需解释意图即可测试。
+- 范围和非范围都明确。
+- 受影响用户或流程已命名。
+- 边界场景和失败路径已列出，或明确标记为不适用。
+- 开放问题为空、非阻塞，或分配给 `NEED_HUMAN`。
+- 有足够风险标签用于选择 `LIGHT`、`STANDARD` 或 `FULL`。
 
-## Fail / Return Rules
+## 失败 / 返回规则
 
-- Missing user goal: return to requirement interview.
-- Missing acceptance criteria: return to acceptance criteria drafting.
-- Ambiguous scope: return to scope boundary analysis.
-- Security, permission, data migration or external side effect uncertainty: block or upgrade to `FULL`.
+- 用户目标缺失：返回需求访谈。
+- 验收标准缺失：返回验收标准草拟。
+- 范围模糊：返回范围边界分析。
+- 安全、权限、数据迁移或外部副作用不确定：阻塞或升级为 `FULL`。
 
-## Evidence
+## 证据
 
-The agent must write the requirement artifact path, unresolved questions, selected risk tags and gate result into the stage result.
+智能体必须把需求产物路径、未解决问题、已选风险标签和门禁结果写入阶段结果。

@@ -1,12 +1,12 @@
-# Quality Standard
+# 质量标准
 
-## Purpose
+## 目的
 
-Define objective gates that stop weak or incomplete agent output before the next stage.
+定义客观门禁，在进入下一阶段前拦截薄弱或不完整的智能体输出。
 
-## Gate Result Contract
+## 门禁结果契约
 
-Every gate returns exactly one of:
+每个门禁只能返回以下状态之一：
 
 - `PASS`
 - `CHANGES_REQUIRED`
@@ -14,7 +14,7 @@ Every gate returns exactly one of:
 - `SKIPPED`
 - `ACCEPTED_RISK`
 
-Every non-pass result must include:
+每个非 `PASS` 结果必须包含：
 
 ```yaml
 return_to: ""
@@ -24,34 +24,34 @@ evidence: []
 user_confirmation_required: false
 ```
 
-## Core Checks
+## 核心检查
 
-- Required artifacts exist for the selected mode.
-- Worklist items are resolved or intentionally blocked.
-- Stage result has valid status, return target, next action and evidence.
-- Implementation diff matches approved write scope.
-- Test evidence maps back to acceptance criteria.
-- Cleanup is verified for data created during tests.
-- CI or remote validation gaps are declared.
+- 所选执行深度要求的产物存在。
+- Worklist item 已解决或被明确阻塞。
+- 阶段结果包含合法状态、返回目标、下一步动作和证据。
+- 实现 diff 与批准的写入范围一致。
+- 测试证据能映射回验收标准。
+- 测试创建的数据已完成清理验证。
+- CI 或远端验证缺口已声明。
 
-## Code Quality Defaults
+## 代码质量默认值
 
-Projects may override these defaults in their project harness.
+项目可在自己的 harness 中覆盖这些默认值。
 
-- Large file warning: source file over 500 lines.
-- Large function warning: function or method over 60 lines.
-- No committed debug prints, temporary sleeps or test-only backdoors.
-- No hard-coded secrets, tokens, tenant ids, passwords or production endpoints.
-- No broad dependency additions without design approval.
+- 源文件超过 500 行提示大文件风险。
+- 函数或方法超过 60 行提示大函数风险。
+- 不提交 debug print、临时 sleep 或测试后门。
+- 不硬编码密钥、token、租户 id、密码或生产端点。
+- 未经过设计批准，不做大范围依赖新增。
 
-## Pass Criteria
+## 通过标准
 
-A quality gate passes only when there is hard evidence for required checks. LLM review text alone is not sufficient proof.
+质量门禁只有在必需检查都有硬证据时才能通过。LLM 审核文字本身不是充分证明。
 
-## Fail / Return Rules
+## 失败 / 返回规则
 
-- Requirement gap: return to requirement stage or block for clarification.
-- Design gap: return to solution design.
-- Test design gap: return to test design.
-- Implementation gap: return to development.
-- Validation gap: return to test execution or Health Gate.
+- 需求缺口：返回需求阶段或阻塞等待澄清。
+- 设计缺口：返回方案设计。
+- 测试设计缺口：返回测试设计。
+- 实现缺口：返回开发。
+- 验证缺口：返回测试执行或 Health Gate。
