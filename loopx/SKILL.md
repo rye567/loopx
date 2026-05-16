@@ -13,9 +13,20 @@ LoopX 是跨 Codex 和 Claude Code 的工程质量门 skill。`loopx/` 目录就
 
 ```bash
 python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
+python loopx/tools/loopx_controller.py status --tracking
+python loopx/tools/loopx_controller.py interview <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
+python loopx/tools/loopx_controller.py spec <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py mode <run_id> --select FULL
+python loopx/tools/loopx_controller.py next <run_id>
+python loopx/tools/loopx_controller.py gate <run_id>
+python loopx/tools/loopx_controller.py git-gate <run_id>
+python loopx/tools/loopx_controller.py close <run_id>
 ```
 
-2. 只能用 `record-stage` 写入阶段结论，用 `advance --to ...` 进入下一阶段；不要手改 `state.json` 把阶段伪造成 `PASS`。
+2. 只能用 `interview`、`spec`、`mode --select ...` 生成或确认前置门产物，用 `record-stage` 写入阶段结论，用 `advance --to ...` 或 `next` 进入下一阶段；不要手改 `state.json` 把阶段伪造成 `PASS`。
 3. `solution_review` 未 `PASS` 前禁止开发；任何业务代码编辑前必须运行：
 
 ```bash
@@ -27,7 +38,7 @@ python loopx/tools/loopx_controller.py can-write --kind business
 ```bash
 python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
 python loopx/tools/loopx_controller.py claim-stage solution_design
-python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/03-solution-design.json --revision 2 --change "修正说明"
+python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 ```
 
 5. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行必须有阶段 `PASS`、写入闸门 `PASS` 和 health gate 证据。
@@ -47,7 +58,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 - `risk.yml`、`health.yml`、`project-profiles.yml`：风险、健康检查和项目 profile 策略。
 - `agents/`：各质量角色的职责边界。
 - `templates/`：阶段文档模板。
-- `schemas/`：运行状态、阶段结果、worklist 和 health 结果结构契约。
+- `schemas/`：运行状态、阶段结果、worklist、health 结果，以及 interview/spec/mode/tracking 前置门禁结构契约。
 
 ## 执行流程
 
@@ -65,12 +76,24 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 ```bash
 python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
 python loopx/tools/loopx_controller.py status
+python loopx/tools/loopx_controller.py status --tracking
+python loopx/tools/loopx_controller.py interview <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
+python loopx/tools/loopx_controller.py spec <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py mode <run_id> --select FULL
+python loopx/tools/loopx_controller.py next <run_id>
 python loopx/tools/loopx_controller.py validate
+python loopx/tools/loopx_controller.py validate --strict
+python loopx/tools/loopx_controller.py gate <run_id>
+python loopx/tools/loopx_controller.py git-gate <run_id>
+python loopx/tools/loopx_controller.py close <run_id>
 python loopx/tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
 python loopx/tools/loopx_controller.py advance --to solution_review
 python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
 python loopx/tools/loopx_controller.py claim-stage solution_design
-python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/03-solution-design.json --revision 2 --change "修正说明"
+python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 

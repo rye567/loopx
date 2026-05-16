@@ -1,5 +1,27 @@
 # LoopX Kit
 
+## 前置门禁最小闭环
+
+LoopX 现在会在实现前持久化早期交付门禁：
+
+```bash
+python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags api_contract
+python loopx/tools/loopx_controller.py status --tracking
+python loopx/tools/loopx_controller.py interview <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
+python loopx/tools/loopx_controller.py spec <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py mode <run_id> --select FULL
+python loopx/tools/loopx_controller.py next <run_id>
+python loopx/tools/loopx_controller.py validate --strict
+python loopx/tools/loopx_controller.py gate <run_id>
+python loopx/tools/loopx_controller.py git-gate <run_id>
+python loopx/tools/loopx_controller.py close <run_id>
+```
+
+新运行会包含 `artifacts/`、需求采访/规格元数据、`mode_decision`、流转策略，以及写入 `worklist.yml` 的阶段追踪列表。`advance --to solution_design` 会在 `requirement_interview`、`spec_review` 和 `mode_selection` 通过前被阻止。
+
 LoopX Kit 是一个用 Git 维护的跨工具工程质量门 skill 包。`loopx/` 是唯一主源，可分别安装到 Codex 和 Claude Code 的 skills 目录；更新时只需要对本仓库执行 `git pull`。
 
 ## 安装
@@ -40,16 +62,28 @@ LoopX 也提供一个本地状态控制器，用于把运行过程从纯提示�
 ```bash
 python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
 python loopx/tools/loopx_controller.py status
+python loopx/tools/loopx_controller.py status --tracking
+python loopx/tools/loopx_controller.py interview <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
+python loopx/tools/loopx_controller.py spec <run_id>
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python loopx/tools/loopx_controller.py mode <run_id> --select FULL
+python loopx/tools/loopx_controller.py next <run_id>
 python loopx/tools/loopx_controller.py validate
+python loopx/tools/loopx_controller.py validate --strict
+python loopx/tools/loopx_controller.py gate <run_id>
+python loopx/tools/loopx_controller.py git-gate <run_id>
+python loopx/tools/loopx_controller.py close <run_id>
 python loopx/tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
 python loopx/tools/loopx_controller.py advance --to solution_review
 python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
 python loopx/tools/loopx_controller.py claim-stage solution_design
-python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/03-solution-design.json --revision 2 --change "修正说明"
+python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-控制器会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `repair-tickets/`。`validate` 只校验结构合法性；阶段推进、review 返工和业务写入必须分别通过 `advance`、`fail-review`/`claim-stage`/`close-repair` 与 `can-write` 闸门。控制器只依赖 Python 标准库。
+控制器会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `repair-tickets/`。`validate` 只校验结构合法性；`gate` 运行严格流程门；`git-gate` 读取本地 Git 变更并写入 diff summary；`close` 在最终报告和严格门都通过后关闭整个 run，并生成 `artifacts/close-evidence.json`。阶段推进、review 返工和业务写入必须分别通过 `advance`、`fail-review`/`claim-stage`/`close-repair` 与 `can-write` 闸门。控制器只依赖 Python 标准库。
 
 ## 更新
 

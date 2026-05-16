@@ -27,6 +27,15 @@
         }
       }
     },
+    "spec": {
+      "type": "object"
+    },
+    "interview": {
+      "type": "object"
+    },
+    "stages": {
+      "type": "array"
+    },
     "items": {
       "type": "array",
       "items": {

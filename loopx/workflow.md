@@ -9,7 +9,7 @@
 默认行为：
 
 1. 必须先完成环境检查、项目分配和风险分级；未显式输出 `mode: LIGHT|STANDARD|FULL` 前，不得写业务代码、测试、配置或 SQL。
-2. 阶段状态只允许 `PASS`、`CHANGES_REQUIRED`、`BLOCKED`、`SKIPPED`、`ACCEPTED_RISK`；`SKIPPED` 仅允许显式 `LIGHT` 或配置允许，`ACCEPTED_RISK` 仅允许用户明确接受风险。
+2. 阶段状态只允许 `PASS`、`CHANGES_REQUIRED`、`BLOCKED`、`SKIPPED`、`ACCEPTED_RISK`、`NEED_HUMAN`；`SKIPPED` 仅允许显式 `LIGHT` 或配置允许，`ACCEPTED_RISK` 仅允许用户明确接受风险。
 3. 除 `PASS`、合法 `SKIPPED` 或用户明确 `ACCEPTED_RISK` 外，不得进入下一阶段。
 4. 同一阶段最多自动返工 2 次，第 3 次仍失败则 `BLOCKED`。
 5. 方案设计和方案审核必须给出影响范围。
@@ -28,7 +28,7 @@
 - 阶段文档和分析文档可以在对应阶段写入；业务代码、测试、配置、SQL、迁移脚本和自动修复属于开发写入。
 - 未声明执行深度前，不得进行开发写入。
 - `STANDARD` 和 `FULL` 未通过方案审核，不得进入开发；未通过测试用例审核，不得进入开发。
-- `STANDARD` 和 `FULL` 只有到 `6. 开发` 且上游门禁满足时，才允许开发写入。
+- `STANDARD` 和 `FULL` 只有到 `10. 开发` 且上游门禁满足时，才允许开发写入。
 - `LIGHT` 只有在项目分配结果中显式输出 `mode: LIGHT`、影响范围、跳过的审核门和最小验证计划，且 `stage_result.status=PASS` 后，才允许轻量开发写入。
 - 非显式 `LIGHT` 不得走轻流程；执行中发现实际影响超过 `LIGHT` 条件时，必须立即停止写入，升级为 `STANDARD` 或 `FULL`，并回到对应阶段重新执行。
 - `CHANGES_REQUIRED` 或 `BLOCKED` 状态下不得继续后续阶段；只能修正 `return_to` 指定阶段、补充证据或等待用户处理。
@@ -47,16 +47,22 @@
 ## 阶段
 
 0. 环境检查：JDK/语言运行时、构建工具、目标模块、验证命令、依赖服务可用性。
-1. 项目分配：范围、模块、风险、依赖、验收标准。
-2. 方案设计：方案、数据流、接口、迁移/兼容计划、影响范围。
-3. 方案审核：需求匹配、设计原则、项目 harness、风险审核结论。
-4. 测试用例设计：业务/API 数据准备、执行入口、断言、清理。
-5. 测试用例审核：覆盖率、清理策略、风险闭环。
-6. 开发：实现、补测试、集成、最小必要验证。
-7. 通用质量审计：检查写入门禁、阶段证据、worklist、设计/实现/验证一致性。
-8. 代码审查：diff 审查、缺陷、缺失测试、模块边界和剩余风险。
-9. 测试执行：逐条对照测试用例执行并输出报告。
-10. Health Gate：流程完成前执行 `/health`，把结果写入健康检查报告和最终结论。
+1. 需求接收：记录原始需求、范围线索和初始风险。
+2. 需求采访：确认业务规则、验收标准、边界情况和开放问题。
+3. Spec 草稿：把采访结果沉淀为可测试的需求规格。
+4. Spec 审核：检查完整性、歧义、范围和可测试性。
+5. 执行等级选择：确认 `LIGHT`、`STANDARD` 或 `FULL`，记录 accepted risk。
+6. 方案设计：方案、数据流、接口、迁移/兼容计划、影响范围。
+7. 方案审核：需求匹配、设计原则、项目 harness、风险审核结论。
+8. 测试用例设计：业务/API 数据准备、执行入口、断言、清理。
+9. 测试用例审核：覆盖率、清理策略、风险闭环。
+10. 开发：实现、补测试、集成、最小必要验证。
+11. 通用质量审计：检查写入门禁、阶段证据、worklist、设计/实现/验证一致性。
+12. 代码审查：diff 审查、缺陷、缺失测试、模块边界和剩余风险。
+13. 测试执行：逐条对照测试用例执行并输出报告。
+14. 健康门：流程完成前执行 `/health`，把结果写入健康检查报告和最终结论。
+15. 发布就绪：检查发布、回滚、CI/远端覆盖和剩余风险。
+16. 最终报告：汇总阶段证据、验证结果、未覆盖项和下一步。
 
 ## 风险分级
 
@@ -92,27 +98,36 @@ stage_result:
 
 | 当前阶段 | `PASS` 后 | `CHANGES_REQUIRED` 后 | `BLOCKED` 后 |
 |---|---|---|---|
-| 0 环境检查 | 1 项目分配 | 0 环境检查 | 等用户处理环境/权限/依赖 |
-| 1 项目分配 | 2 方案设计或 LIGHT 轻流程 | 1 项目分配 | 等用户澄清需求 |
-| 2 方案设计 | 3 方案审核 | 2 方案设计 | 等用户决策 |
-| 3 方案审核 | 等用户确认后到 4 | 2 方案设计 | 等用户处理 |
-| 4 测试用例设计 | 5 测试用例审核 | 4 测试用例设计 | 等用户处理 |
-| 5 测试用例审核 | 等用户确认后到 6 | 4 测试用例设计 | 等用户处理 |
-| 6 开发 | 7 通用质量审计 | 6 开发 | 等用户处理 |
-| 7 通用质量审计 | 8 代码审查 | 2/4/6，按失败原因选择 | 等用户处理 |
-| 8 代码审查 | 等用户确认后到 9 | 6 开发 | 等用户处理 |
-| 9 测试执行 | 10 Health Gate | 4/6，按失败原因选择 | 等用户处理 |
-| 10 Health Gate | 最终报告 | 对应责任阶段 | 等用户处理 |
+| 0 环境检查 | 1 需求接收 | 0 环境检查 | 等用户处理环境/权限/依赖 |
+| 1 需求接收 | 2 需求采访 | 1 需求接收 | 等用户澄清原始需求 |
+| 2 需求采访 | 3 Spec 草稿 | 2 需求采访 | 等用户补充关键问题 |
+| 3 Spec 草稿 | 4 Spec 审核 | 3 Spec 草稿 | 等用户处理规格阻塞 |
+| 4 Spec 审核 | 5 执行等级选择 | 3 Spec 草稿 | 等用户处理规格争议 |
+| 5 执行等级选择 | 6 方案设计 | 5 执行等级选择 | 等用户确认执行等级或 accepted risk |
+| 6 方案设计 | 7 方案审核 | 6 方案设计 | 等用户决策 |
+| 7 方案审核 | 等用户确认后到 8 | 6 方案设计 | 等用户处理 |
+| 8 测试用例设计 | 9 测试用例审核 | 8 测试用例设计 | 等用户处理 |
+| 9 测试用例审核 | 等用户确认后到 10 | 8 测试用例设计 | 等用户处理 |
+| 10 开发 | 11 通用质量审计 | 10 开发 | 等用户处理 |
+| 11 通用质量审计 | 12 代码审查 | 6/8/10，按失败原因选择 | 等用户处理 |
+| 12 代码审查 | 等用户确认后到 13 | 10 开发 | 等用户处理 |
+| 13 测试执行 | 14 健康门 | 8/10，按失败原因选择 | 等用户处理 |
+| 14 健康门 | 15 发布就绪 | 对应责任阶段 | 等用户处理 |
+| 15 发布就绪 | 16 最终报告 | 对应责任阶段 | 等用户处理 |
+| 16 最终报告 | 完成 | 对应责任阶段 | 等用户处理 |
 
 审核失败反馈规则：
 
+- 需求采访失败：`return_to: 需求采访`，不得生成或通过 Spec。
+- Spec 审核失败：`return_to: Spec 草稿`。
+- 执行等级选择降级：必须记录 `ACCEPTED_RISK` 和用户接受原因。
 - 方案审核失败：`return_to: 方案设计`。
 - 测试用例审核失败：`return_to: 测试用例设计`。
 - 开发自检失败：`return_to: 开发`。
-- 通用质量审计失败：方案缺陷回方案设计，实现缺陷回开发，验证缺陷回测试用例设计，需求边界不清则 `BLOCKED`。
+- 通用质量审计失败：方案缺陷回方案设计，实现缺陷回开发，验证缺陷回测试用例设计，需求边界不清则回 Spec 或 `BLOCKED`。
 - 代码审查失败：`return_to: 开发`。
 - 测试执行失败：实现错误回开发，测试设计缺失回测试用例设计，环境问题 `BLOCKED`。
-- Health Gate 失败：根据失败项回到对应责任阶段；工具不可用但非必需时只能记录未覆盖，不能宣称完整通过。
+- 健康门或发布就绪失败：根据失败项回到对应责任阶段；工具不可用但非必需时只能记录未覆盖，不能宣称完整通过。
 
 ## Worklist 状态
 
@@ -134,18 +149,30 @@ stage_result:
 ```bash
 python tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
 python tools/loopx_controller.py status
+python tools/loopx_controller.py status --tracking
+python tools/loopx_controller.py interview <run_id>
+python tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
+python tools/loopx_controller.py spec <run_id>
+python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python tools/loopx_controller.py mode <run_id> --select FULL
+python tools/loopx_controller.py next <run_id>
 python tools/loopx_controller.py validate
+python tools/loopx_controller.py validate --strict
+python tools/loopx_controller.py gate <run_id>
+python tools/loopx_controller.py git-gate <run_id>
+python tools/loopx_controller.py close <run_id>
 python tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
 python tools/loopx_controller.py advance --to solution_review
 python tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
 python tools/loopx_controller.py claim-stage solution_design
-python tools/loopx_controller.py close-repair --item W1 --artifact stage-results/03-solution-design.json --revision 2 --change "修正说明"
+python tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 python tools/loopx_controller.py can-write --kind business
 ```
 
 控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。
 
-`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`，业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
+`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
 
 ## 本地执行硬约束
 

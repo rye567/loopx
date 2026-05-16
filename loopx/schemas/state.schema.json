@@ -64,6 +64,24 @@
     "loop_attempts": {
       "type": "object"
     },
+    "interview": {
+      "type": "object"
+    },
+    "spec": {
+      "type": "object"
+    },
+    "mode_decision": {
+      "type": "object"
+    },
+    "tracking": {
+      "type": "object"
+    },
+    "transition_policy": {
+      "type": "object"
+    },
+    "git_gate": {
+      "type": "object"
+    },
     "stages": {
       "type": "object"
     }

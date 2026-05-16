@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "required": [
+    "show_on_every_update",
+    "worklist"
+  ],
+  "properties": {
+    "show_on_every_update": {
+      "type": "boolean"
+    },
+    "worklist": {
+      "type": "string"
+    },
+    "snapshot_required_for_pass": {
+      "type": "boolean"
+    },
+    "current_checklist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blocking_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

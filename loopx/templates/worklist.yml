@@ -2,9 +2,34 @@ run:
   id:
   requirement:
   mode:
+  recommended_mode:
+  selected_mode:
   status:
   current_stage:
   next_action:
+  spec_path:
+  tracking_snapshot_path:
+
+spec:
+  status:
+  path:
+  approved: false
+
+interview:
+  status:
+  unanswered_questions: 0
+  path:
+
+stages:
+  - id:
+    stage:
+    name:
+    status: PENDING
+    required: true
+    required_for_modes: []
+    owner_agent:
+    evidence: []
+    blockers: []
 
 items:
   - id: W001

@@ -32,6 +32,10 @@ REQUIRED_STANDARDS = [
 
 REQUIRED_SKILLS = [
     "requirement-interview-skill.md",
+    "spec-generation-skill.md",
+    "spec-review-skill.md",
+    "mode-selection-skill.md",
+    "stage-tracking-skill.md",
     "architecture-design-skill.md",
     "design-review-skill.md",
     "test-design-skill.md",
@@ -42,11 +46,20 @@ REQUIRED_SKILLS = [
 REQUIRED_AGENT_DOCS = [
     "controller.md",
     "requirement-manager.md",
+    "requirement-interviewer-agent.md",
+    "spec-writer-agent.md",
+    "spec-reviewer-agent.md",
+    "mode-selector-agent.md",
     "release-manager.md",
 ]
 
 REQUIRED_TEMPLATES = [
     "00-requirement-intake.md",
+    "01-requirement-interview.md",
+    "02-spec.md",
+    "03-spec-review.md",
+    "04-mode-selection.md",
+    "tracking-snapshot.md",
     "11-release-readiness.md",
     "12-final-report.md",
 ]
@@ -55,6 +68,10 @@ REQUIRED_SCHEMAS = [
     "state.schema.json",
     "stage-result.schema.json",
     "worklist.schema.json",
+    "interview.schema.json",
+    "spec.schema.json",
+    "mode.schema.json",
+    "tracking.schema.json",
     "health-result.schema.json",
 ]
 
