@@ -1,0 +1,46 @@
+{
+  "type": "object",
+  "required": [
+    "recommended",
+    "selected",
+    "selection_status",
+    "selected_by",
+    "reason",
+    "accepted_risk"
+  ],
+  "properties": {
+    "recommended": {
+      "type": "string",
+      "enum": ["LIGHT", "STANDARD", "FULL"]
+    },
+    "selected": {
+      "type": "string"
+    },
+    "selection_status": {
+      "type": "string",
+      "enum": ["NEED_HUMAN", "CONFIRMED"]
+    },
+    "selected_by": {
+      "type": "string",
+      "enum": ["auto", "user"]
+    },
+    "reason": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "accepted_risk": {
+      "type": "object",
+      "required": ["selected_lower_than_recommended", "reason"],
+      "properties": {
+        "selected_lower_than_recommended": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

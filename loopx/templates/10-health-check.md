@@ -21,7 +21,7 @@
 
 ```yaml
 stage_result:
-  stage: "10 Health Gate"
+  stage: "10 健康门"
   status:
   return_to:
   next_action:

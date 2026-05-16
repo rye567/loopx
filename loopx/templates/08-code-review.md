@@ -2,8 +2,8 @@
 
 - 状态：
 - Findings：
-- Open Questions：
-- Change Summary：
+- 开放问题：
+- 变更摘要：
 - Verdict：
 - Evidence：
 - 下一阶段：

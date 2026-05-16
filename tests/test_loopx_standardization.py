@@ -45,5 +45,36 @@ class LoopXStandardizationTest(unittest.TestCase):
                 self.assertIn("失败处理", text)
 
 
+    def test_required_front_gate_schemas_are_first_class_contracts(self):
+        required = {
+            "interview.schema.json",
+            "spec.schema.json",
+            "mode.schema.json",
+            "tracking.schema.json",
+        }
+        self.assertTrue(required.issubset(set(self.check.REQUIRED_SCHEMAS)))
+        base = ROOT / "loopx" / "schemas"
+        for name in required:
+            with self.subTest(name=name):
+                text = (base / name).read_text(encoding="utf-8")
+                self.assertIn('"type": "object"', text)
+
+    def test_front_gate_agent_docs_define_role_boundaries(self):
+        required = [
+            "requirement-interviewer-agent.md",
+            "spec-writer-agent.md",
+            "spec-reviewer-agent.md",
+            "mode-selector-agent.md",
+        ]
+        self.assertTrue(set(required).issubset(set(self.check.REQUIRED_AGENT_DOCS)))
+        base = ROOT / "loopx" / "agents"
+        for name in required:
+            with self.subTest(name=name):
+                text = (base / name).read_text(encoding="utf-8")
+                for term in ("职责", "输入", "输出", "门禁", "禁止事项"):
+                    self.assertIn(term, text)
+                self.assertIn("不得", text)
+
+
 if __name__ == "__main__":
     unittest.main()

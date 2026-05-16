@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "required": [
+    "required",
+    "status",
+    "artifact",
+    "approved",
+    "gate_result"
+  ],
+  "properties": {
+    "required": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["NOT_CREATED", "DRAFT", "APPROVED", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN"]
+    },
+    "artifact": {
+      "type": "string"
+    },
+    "approved": {
+      "type": "boolean"
+    },
+    "gate_result": {
+      "type": "string",
+      "enum": ["PENDING", "PASS", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN"]
+    },
+    "required_sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -2,13 +2,18 @@
 import argparse
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 STAGE_SEQUENCE = [
     "environment_check",
-    "assignment",
+    "requirement_intake",
+    "requirement_interview",
+    "spec_draft",
+    "spec_review",
+    "mode_selection",
     "solution_design",
     "solution_review",
     "test_design",
@@ -18,28 +23,50 @@ STAGE_SEQUENCE = [
     "code_review",
     "test_execution",
     "health_gate",
+    "release_readiness",
     "final_report",
 ]
 STAGES = set(STAGE_SEQUENCE)
-STAGE_STATUSES = {"PASS", "CHANGES_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK"}
+STAGE_STATUSES = {"PASS", "CHANGES_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK", "NEED_HUMAN"}
 PASSING_STATUSES = {"PASS", "ACCEPTED_RISK"}
+FULL_REQUIRED_PASS_STAGES = [
+    "solution_design",
+    "solution_review",
+    "test_design",
+    "test_review",
+    "development",
+    "quality_audit",
+    "code_review",
+    "test_execution",
+    "health_gate",
+    "release_readiness",
+]
 STAGE_RESULT_FILES = {
-    "environment_check": "01-environment-check.json",
-    "assignment": "02-assignment.json",
-    "solution_design": "03-solution-design.json",
-    "solution_review": "04-solution-review.json",
-    "test_design": "05-test-design.json",
-    "test_review": "06-test-review.json",
-    "development": "07-development.json",
-    "quality_audit": "08-quality-audit.json",
-    "code_review": "09-code-review.json",
-    "test_execution": "10-test-execution.json",
-    "health_gate": "11-health-gate.json",
-    "final_report": "12-final-report.json",
+    "environment_check": "00-environment-check.json",
+    "requirement_intake": "01-requirement-intake.json",
+    "requirement_interview": "02-requirement-interview.json",
+    "spec_draft": "03-spec-draft.json",
+    "spec_review": "04-spec-review.json",
+    "mode_selection": "05-mode-selection.json",
+    "solution_design": "06-solution-design.json",
+    "solution_review": "07-solution-review.json",
+    "test_design": "08-test-design.json",
+    "test_review": "09-test-review.json",
+    "development": "10-development.json",
+    "quality_audit": "11-quality-audit.json",
+    "code_review": "12-code-review.json",
+    "test_execution": "13-test-execution.json",
+    "health_gate": "14-health-gate.json",
+    "release_readiness": "15-release-readiness.json",
+    "final_report": "16-final-report.json",
 }
 DEFAULT_STAGE_OWNERS = {
     "environment_check": "environment-check-agent",
-    "assignment": "project-manager",
+    "requirement_intake": "project-manager",
+    "requirement_interview": "requirement-manager",
+    "spec_draft": "requirement-manager",
+    "spec_review": "requirement-manager",
+    "mode_selection": "controller",
     "solution_design": "solution-designer",
     "solution_review": "solution-reviewer",
     "test_design": "test-designer",
@@ -49,7 +76,27 @@ DEFAULT_STAGE_OWNERS = {
     "code_review": "code-reviewer",
     "test_execution": "test-runner",
     "health_gate": "quality-auditor",
+    "release_readiness": "release-manager",
     "final_report": "release-manager",
+}
+STAGE_DISPLAY_NAMES = {
+    "environment_check": "环境检查",
+    "requirement_intake": "需求接收",
+    "requirement_interview": "需求采访",
+    "spec_draft": "规格草稿",
+    "spec_review": "规格审核",
+    "mode_selection": "执行等级选择",
+    "solution_design": "方案设计",
+    "solution_review": "方案审核",
+    "test_design": "测试设计",
+    "test_review": "测试审核",
+    "development": "开发",
+    "quality_audit": "质量审计",
+    "code_review": "代码审查",
+    "test_execution": "测试执行",
+    "health_gate": "健康门",
+    "release_readiness": "发布就绪",
+    "final_report": "最终报告",
 }
 
 class YamlSubsetError(ValueError):
@@ -91,13 +138,36 @@ def yaml_string(value):
 
 
 def render_worklist(run_id, requirement, mode):
+    stage_lines = []
+    for index, stage in enumerate(STAGE_SEQUENCE):
+        stage_lines.extend([
+            f"  - id: {yaml_string(f'{index:02d}')}",
+            f"    stage: {stage}",
+            f"    name: {STAGE_DISPLAY_NAMES[stage]}",
+            "    status: PENDING",
+            "    required: true",
+            "    evidence: \"\"",
+        ])
     return f"""run:
   id: {yaml_string(run_id)}
   requirement: {yaml_string(requirement)}
   mode: {mode}
   status: ACTIVE
   current_stage: environment_check
-  next_action: assignment
+  next_action: requirement_intake
+
+spec:
+  status: NOT_CREATED
+  path: {yaml_string(f".loopx/runs/{run_id}/artifacts/spec.md")}
+  approved: false
+
+interview:
+  status: NOT_STARTED
+  unanswered_questions: 0
+  path: {yaml_string(f".loopx/runs/{run_id}/artifacts/interview.md")}
+
+stages:
+{chr(10).join(stage_lines)}
 
 items: []
 """
@@ -108,6 +178,8 @@ def render_yaml_value(value):
         if not value:
             return "[]"
         return "[" + ", ".join(yaml_string(item) for item in value) + "]"
+    if isinstance(value, bool):
+        return "true" if value else "false"
     if value is None:
         return '""'
     if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.-]+", value):
@@ -123,8 +195,21 @@ def dump_worklist(worklist):
     for key in ("id", "requirement", "mode", "status", "current_stage", "next_action"):
         if key in worklist.get("run", {}):
             lines.append(f"  {key}: {render_yaml_value(worklist['run'][key])}")
-    lines.append("items:")
-    for item in worklist.get("items") or []:
+    for section in ("spec", "interview"):
+        if section in worklist:
+            lines.append(f"{section}:")
+            for key, value in worklist[section].items():
+                lines.append(f"  {key}: {render_yaml_value(value)}")
+    if "stages" in worklist:
+        lines.append("stages:")
+        for stage in worklist.get("stages") or []:
+            lines.append(f"  - id: {render_yaml_value(stage.get('id', ''))}")
+            for key in ("stage", "name", "status", "required", "evidence"):
+                lines.append(f"    {key}: {render_yaml_value(stage.get(key, ''))}")
+    items = worklist.get("items") or []
+    if not items:
+        lines.append("items: []")
+    for item in items:
         lines.append(f"  - id: {render_yaml_value(item.get('id', ''))}")
         for key in (
             "title",
@@ -341,6 +426,13 @@ def load_worklist(project, state):
     return worklist_path, parse_yaml_subset(worklist_path.read_text(encoding="utf-8"))
 
 
+def project_path(project, path):
+    resolved = Path(path or "")
+    if not resolved.is_absolute():
+        resolved = project / resolved
+    return resolved
+
+
 def stage_index(stage):
     return STAGE_SEQUENCE.index(stage)
 
@@ -377,6 +469,224 @@ def resolve_mode(mode, risk_tags):
     return "STANDARD"
 
 
+def mode_rank(mode):
+    return {"LIGHT": 1, "STANDARD": 2, "FULL": 3}.get(mode, 0)
+
+
+def interview_state(run_id, mode):
+    return {
+        "required": True,
+        "mode": mode,
+        "status": "NOT_STARTED",
+        "artifact": f".loopx/runs/{run_id}/artifacts/interview.md",
+        "unanswered_questions": 0,
+        "can_skip": False,
+    }
+
+
+def spec_state(run_id):
+    return {
+        "required": True,
+        "status": "NOT_CREATED",
+        "artifact": f".loopx/runs/{run_id}/artifacts/spec.md",
+        "approved": False,
+        "gate_result": "PENDING",
+    }
+
+
+def mode_decision_state(mode, risk_tags, selected_by):
+    confirmed = selected_by != "auto"
+    return {
+        "recommended": mode,
+        "selected": mode if confirmed else "",
+        "selection_status": "CONFIRMED" if confirmed else "NEED_HUMAN",
+        "selected_by": selected_by,
+        "reason": risk_tags,
+        "accepted_risk": {
+            "selected_lower_than_recommended": False,
+            "reason": "",
+        },
+    }
+
+
+def transition_policy_state():
+    return {
+        "require_interview_before_spec": True,
+        "require_spec_before_design": True,
+        "require_mode_before_design": True,
+        "require_design_review_before_development": True,
+        "require_git_gate_before_final_report": True,
+    }
+
+
+def tracking_state(run_id):
+    return {
+        "show_on_every_update": True,
+        "worklist": f".loopx/runs/{run_id}/worklist.yml",
+    }
+
+
+def interview_question_count(mode):
+    if mode == "FULL":
+        return 18
+    if mode == "STANDARD":
+        return 10
+    return 3
+
+
+def render_interview_artifact(state):
+    return f"""# 需求采访
+
+## 运行信息
+
+- 运行 ID：{state.get("run_id")}
+- 执行等级：{state.get("mode")}
+- 原始需求：{state.get("requirement")}
+
+## 已确认事实
+
+- 待采访确认。
+
+## 采访问题
+
+1. 你期望最终行为是什么？
+2. 验收标准是什么？
+3. 哪些内容不在本次范围内？
+
+## 开放问题
+
+- 待用户回答。
+
+## 采访门禁
+
+```yaml
+stage_result:
+  stage: requirement_interview
+  status: CHANGES_REQUIRED
+  next_action: record-stage --stage requirement_interview --status PASS
+```
+"""
+
+
+def render_spec_artifact(state):
+    return f"""# 需求规格
+
+## 摘要
+
+{state.get("requirement")}
+
+## 背景
+
+## 当前行为
+
+## 期望行为
+
+## 用户 / 角色 / 套餐
+
+## 业务规则
+
+## 验收标准
+
+## 范围内
+
+## 范围外
+
+## 边界情况
+
+## 错误处理
+
+## 前端行为
+
+## 后端行为
+
+## 数据 / 持久化影响
+
+## 外部 API 影响
+
+## 测试策略
+
+## 发布 / 回滚说明
+
+## 开放问题
+
+## 假设
+
+## 执行等级决策
+
+- 推荐等级：{state.get("mode_decision", {}).get("recommended", state.get("mode"))}
+- 当前选择：{state.get("mode_decision", {}).get("selected", state.get("mode"))}
+"""
+
+
+def update_worklist_state(project, state, stage=None, stage_status=None):
+    try:
+        worklist_path, worklist = load_worklist(project, state)
+    except (FileNotFoundError, YamlSubsetError):
+        return
+    worklist.setdefault("run", {})["current_stage"] = state.get("current_stage")
+    worklist["run"]["next_action"] = state.get("next_action", "")
+    if "spec" in state:
+        worklist["spec"] = {
+            "status": state["spec"].get("status", ""),
+            "path": state["spec"].get("artifact", ""),
+            "approved": state["spec"].get("approved", False),
+        }
+    if "interview" in state:
+        worklist["interview"] = {
+            "status": state["interview"].get("status", ""),
+            "unanswered_questions": state["interview"].get("unanswered_questions", 0),
+            "path": state["interview"].get("artifact", ""),
+        }
+    if stage and "stages" in worklist:
+        for item in worklist.get("stages") or []:
+            if item.get("stage") == stage:
+                item["status"] = stage_status or item.get("status", "PENDING")
+                artifact = ""
+                if stage == "requirement_interview":
+                    artifact = state.get("interview", {}).get("artifact", "")
+                if stage in {"spec_draft", "spec_review"}:
+                    artifact = state.get("spec", {}).get("artifact", "")
+                if not artifact and stage in STAGE_RESULT_FILES:
+                    artifact = f".loopx/runs/{state.get('run_id')}/stage-results/{STAGE_RESULT_FILES[stage]}"
+                item["evidence"] = artifact or item.get("evidence", "")
+    worklist_path.write_text(dump_worklist(worklist), encoding="utf-8")
+
+
+def build_tracking_snapshot(state):
+    current = state.get("current_stage", "")
+    completed = state.get("stages", {})
+    snapshot = []
+    for index, stage in enumerate(STAGE_SEQUENCE):
+        snapshot.append({
+            "id": f"{index:02d}",
+            "stage": stage,
+            "name": STAGE_DISPLAY_NAMES[stage],
+            "status": completed.get(stage, "IN_PROGRESS" if stage == current else "PENDING"),
+        })
+    return snapshot
+
+
+def format_tracking(state):
+    lines = [
+        "LoopX 追踪",
+        "",
+        f"运行: {state.get('run_id')}",
+        f"模式: {state.get('mode')}",
+        f"当前阶段: {STAGE_DISPLAY_NAMES.get(state.get('current_stage'), state.get('current_stage'))}",
+        f"需求规格: {state.get('spec', {}).get('status', 'UNKNOWN')}",
+        "Git 门禁: PENDING",
+        "",
+        "阶段:",
+    ]
+    current = state.get("current_stage")
+    statuses = state.get("stages", {})
+    for index, stage in enumerate(STAGE_SEQUENCE):
+        status = statuses.get(stage)
+        marker = "[>]" if stage == current else "[x]" if status in PASSING_STATUSES else "[ ]"
+        lines.append(f"{marker} {index:02d} {STAGE_DISPLAY_NAMES[stage]}")
+    return "\n".join(lines) + "\n"
+
+
 def default_next_stage(stage):
     index = stage_index(stage)
     if index + 1 >= len(STAGE_SEQUENCE):
@@ -386,6 +696,126 @@ def default_next_stage(stage):
 
 def stage_result_path(directory, stage):
     return directory / "stage-results" / STAGE_RESULT_FILES[stage]
+
+
+SPEC_REQUIRED_SECTIONS = [
+    ("Summary", ("## Summary", "## 摘要")),
+    ("Expected Behavior", ("## Expected Behavior", "## 期望行为")),
+    ("Acceptance Criteria", ("## Acceptance Criteria", "## 验收标准")),
+    ("Scope", ("## Scope", "## In Scope", "## 范围内")),
+    ("Out of Scope", ("## Out of Scope", "## 范围外")),
+    ("Edge Cases", ("## Edge Cases", "## 边界情况")),
+    ("Test Strategy", ("## Test Strategy", "## 测试策略")),
+    ("Execution Mode", ("## Execution Mode", "## Execution Mode Decision", "## 执行等级", "## 执行等级决策")),
+]
+
+
+def missing_spec_sections(text):
+    normalized = text.casefold()
+    missing = []
+    for section, headings in SPEC_REQUIRED_SECTIONS:
+        if not any(heading.casefold() in normalized for heading in headings):
+            missing.append(section)
+    return missing
+
+
+def spec_section_content(text, headings):
+    matches = list(re.finditer(r"^##\s+(.+?)\s*$", text, re.MULTILINE))
+    aliases = {heading.removeprefix("##").strip().casefold() for heading in headings}
+    for index, match in enumerate(matches):
+        title = match.group(1).strip().casefold()
+        if title not in aliases:
+            continue
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        return text[start:end].strip()
+    return None
+
+
+def empty_spec_sections(text):
+    empty = []
+    for section, headings in SPEC_REQUIRED_SECTIONS:
+        content = spec_section_content(text, headings)
+        if content is not None and not content:
+            empty.append(section)
+    return empty
+
+
+def interview_has_unanswered_placeholders(text):
+    markers = [
+        "待用户回答",
+        "待采访确认",
+        "待确认",
+        "TBD",
+        "TODO",
+        "å¾…ç”¨æˆ·å›žç­”",
+        "å¾…é‡‡è®¿ç¡®è®¤",
+    ]
+    return any(marker in text for marker in markers)
+
+
+def collect_git_status(project):
+    try:
+        probe = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "--is-inside-work-tree"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return "NEED_HUMAN", "", str(exc)
+    if probe.returncode != 0 or probe.stdout.strip() != "true":
+        return "NEED_HUMAN", "", "not a git work tree"
+    try:
+        status = subprocess.run(
+            ["git", "-C", str(project), "status", "--short"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return "NEED_HUMAN", "", str(exc)
+    if status.returncode != 0:
+        return "NEED_HUMAN", "", (status.stderr or "git status failed").strip()
+    summary = status.stdout.strip()
+    if not summary:
+        return "NEED_HUMAN", "", "no changed files"
+    return "PASS", summary, ""
+
+
+def build_close_evidence(project, run_id, state):
+    directory = get_run_dir(project, run_id)
+    evidence_matrix = {}
+    for stage in STAGE_SEQUENCE:
+        result_path = stage_result_path(directory, stage)
+        entry = {
+            "status": state.get("stages", {}).get(stage, "PENDING"),
+            "stage_result": f".loopx/runs/{run_id}/stage-results/{STAGE_RESULT_FILES[stage]}",
+            "evidence": [],
+        }
+        if result_path.exists():
+            try:
+                result = read_json(result_path)
+                entry["evidence"] = result.get("evidence", [])
+            except ValueError:
+                entry["evidence"] = []
+        evidence_matrix[stage] = entry
+    return {
+        "run_id": run_id,
+        "status": "PASS",
+        "mode": state.get("mode"),
+        "git_gate": state.get("git_gate", {}),
+        "evidence_matrix": evidence_matrix,
+        "ci_coverage": {
+            "status": "LOCAL_ONLY",
+            "summary": "CI/remote verification not executed by local close",
+        },
+        "uncovered": [
+            "CI/remote verification not covered by local close",
+        ],
+    }
 
 
 def repair_ticket_root(project, run_id, state=None):
@@ -433,18 +863,41 @@ def open_repair_tickets_for_stage(project, run_id, stage, state=None):
 def record_stage_result(project, run_id, stage, status, evidence, return_to="", next_action=None, affected_work_items=None, blocked_reason=""):
     directory = get_run_dir(project, run_id)
     state = load_state(project, run_id)
+    snapshot_state = dict(state)
+    snapshot_state["stages"] = dict(state.get("stages", {}))
+    snapshot_state["stages"][stage] = status
     result = {
         "stage": stage,
         "status": status,
+        "mode": state.get("mode", ""),
+        "summary": "",
         "return_to": return_to,
         "next_action": next_action or (return_to if status == "CHANGES_REQUIRED" else default_next_stage(stage)),
         "affected_work_items": affected_work_items or [],
         "evidence": evidence,
+        "tracking_snapshot": build_tracking_snapshot(snapshot_state),
+        "gate": {
+            "result": status,
+            "blocking_issues": [blocked_reason] if blocked_reason else [],
+            "non_blocking_issues": [],
+        },
         "user_confirmation_required": status in {"CHANGES_REQUIRED", "BLOCKED"},
         "blocked_reason": blocked_reason,
     }
     write_json(stage_result_path(directory, stage), result)
     state.setdefault("stages", {})[stage] = status
+    if stage == "requirement_interview":
+        state.setdefault("interview", interview_state(run_id, state.get("mode", "")))["status"] = status
+    if stage == "spec_review":
+        spec = state.setdefault("spec", spec_state(run_id))
+        spec["gate_result"] = status
+        spec["approved"] = status in PASSING_STATUSES
+        if status in PASSING_STATUSES:
+            spec["status"] = "APPROVED"
+    if stage == "mode_selection":
+        mode_decision = state.setdefault("mode_decision", mode_decision_state(state.get("mode", ""), state.get("risk_tags", []), "auto"))
+        if status in PASSING_STATUSES:
+            mode_decision["selection_status"] = "CONFIRMED"
     state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(stage, stage)
     if status == "CHANGES_REQUIRED":
         target = return_to or stage
@@ -483,7 +936,112 @@ def resolve_run_id(project, run_id):
     return resolved
 
 
-def validate_run(project, run_id):
+def strict_validation_errors(project, run_id, state, worklist):
+    errors = []
+    for key in ("interview", "spec", "mode_decision", "tracking", "transition_policy", "git_gate"):
+        if key not in state or state[key] is None:
+            errors.append(f"state.{key} is required for strict validation")
+    if errors:
+        return errors
+    for state_key, schema_name in (
+        ("interview", "interview"),
+        ("spec", "spec"),
+        ("mode_decision", "mode"),
+        ("tracking", "tracking"),
+    ):
+        errors.extend(validate_schema(state[state_key], load_schema(schema_name), f"state.{state_key}"))
+
+    mode_decision = state.get("mode_decision", {})
+    if not mode_decision.get("recommended"):
+        errors.append("state.mode_decision.recommended is required for strict validation")
+    if not mode_decision.get("selected"):
+        errors.append("state.mode_decision.selected is required for strict validation")
+    if mode_decision.get("selection_status") != "CONFIRMED":
+        errors.append("state.mode_decision.selection_status must be CONFIRMED for strict validation")
+    if mode_rank(mode_decision.get("recommended")) > mode_rank(mode_decision.get("selected")):
+        accepted = mode_decision.get("accepted_risk", {})
+        if not accepted.get("selected_lower_than_recommended") or not accepted.get("reason"):
+            errors.append("state.mode_decision.accepted_risk.reason is required when selected mode is lower than recommended")
+    if state.get("mode") == "FULL" or mode_decision.get("selected") == "FULL":
+        for stage in ("solution_review", "test_review", "health_gate", "release_readiness"):
+            if state.get("stages", {}).get(stage) == "SKIPPED":
+                errors.append(f"FULL mode cannot skip {stage}")
+    if state.get("stages", {}).get("final_report") == "PASS":
+        git_gate = state.get("git_gate", {})
+        if git_gate.get("status") != "PASS":
+            errors.append("state.git_gate.status must be PASS before final_report PASS")
+        if not git_gate.get("diff_summary"):
+            errors.append("state.git_gate.diff_summary is required for final_report PASS")
+
+    worklist_stages = worklist.get("stages") or []
+    worklist_by_stage = {stage.get("stage"): stage for stage in worklist_stages if isinstance(stage, dict)}
+    seen = set(worklist_by_stage)
+    for stage in STAGE_SEQUENCE:
+        if stage not in seen:
+            errors.append(f"worklist.stages must include {stage}")
+    if worklist.get("run", {}).get("current_stage") != state.get("current_stage"):
+        errors.append("worklist.run.current_stage must match state.current_stage")
+    for stage, status in state.get("stages", {}).items():
+        worklist_stage = worklist_by_stage.get(stage)
+        if worklist_stage and worklist_stage.get("status") != status:
+            errors.append(f"worklist.stages[{stage}].status must match state.stages.{stage}")
+
+    directory = get_run_dir(project, run_id)
+    for stage, status in state.get("stages", {}).items():
+        if status not in PASSING_STATUSES:
+            continue
+        result_path = stage_result_path(directory, stage)
+        if not result_path.exists():
+            errors.append(f"{stage} is {status} but {result_path.name} is missing")
+            continue
+        try:
+            result = read_json(result_path)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        if not result.get("tracking_snapshot"):
+            errors.append(f"{result_path.name}.tracking_snapshot is required for strict validation")
+        else:
+            snapshot_stages = {item.get("stage") for item in result.get("tracking_snapshot", []) if isinstance(item, dict)}
+            if snapshot_stages != set(STAGE_SEQUENCE):
+                errors.append(f"{result_path.name}.tracking_snapshot must include all LoopX stages")
+
+    for stage, key in (("requirement_interview", "interview"), ("spec_review", "spec")):
+        if state.get("stages", {}).get(stage) in PASSING_STATUSES:
+            artifact = Path(state.get(key, {}).get("artifact", ""))
+            if not artifact.is_absolute():
+                artifact = project / artifact
+            if not artifact.exists():
+                errors.append(f"state.{key}.artifact does not exist for PASS {stage}")
+                continue
+            if stage == "requirement_interview" and state.get("interview", {}).get("unanswered_questions", 0) != 0:
+                errors.append("state.interview.unanswered_questions must be 0 for PASS requirement_interview")
+            if stage == "requirement_interview":
+                try:
+                    text = artifact.read_text(encoding="utf-8")
+                except OSError as exc:
+                    errors.append(f"state.interview.artifact cannot be read: {exc}")
+                    continue
+                if interview_has_unanswered_placeholders(text):
+                    errors.append("interview.md still contains unanswered placeholders")
+            if stage == "spec_review":
+                try:
+                    text = artifact.read_text(encoding="utf-8")
+                except OSError as exc:
+                    errors.append(f"state.spec.artifact cannot be read: {exc}")
+                    continue
+                for section in missing_spec_sections(text):
+                    errors.append(f"spec.md missing required section: {section}")
+                for section in empty_spec_sections(text):
+                    errors.append(f"spec.md required section is empty: {section}")
+    if state.get("stages", {}).get("final_report") == "PASS" and (state.get("mode") == "FULL" or mode_decision.get("selected") == "FULL"):
+        for stage in FULL_REQUIRED_PASS_STAGES:
+            if state.get("stages", {}).get(stage) not in PASSING_STATUSES:
+                errors.append(f"FULL mode requires {stage} PASS before final_report PASS")
+    return errors
+
+
+def validate_run(project, run_id, strict=False):
     errors = []
     directory = get_run_dir(project, run_id)
     state_path = directory / "state.json"
@@ -507,6 +1065,7 @@ def validate_run(project, run_id):
     worklist_path = Path(worklist_rel)
     if not worklist_path.is_absolute():
         worklist_path = project / worklist_path
+    worklist = None
     try:
         worklist = parse_yaml_subset(worklist_path.read_text(encoding="utf-8"))
         errors.extend(validate_schema(worklist, load_schema("worklist")))
@@ -524,6 +1083,8 @@ def validate_run(project, run_id):
                 errors.append(str(exc))
                 continue
             errors.extend(validate_schema(result, load_schema("stage-result"), result_path.name))
+    if strict and worklist is not None:
+        errors.extend(strict_validation_errors(project, run_id, state, worklist))
     return errors
 
 
@@ -537,6 +1098,7 @@ def cmd_init(args, stdout):
         print(f"run already exists: {run_id}", file=stdout)
         return 1
     directory.mkdir(parents=True)
+    (directory / "artifacts").mkdir()
     (directory / "stage-results").mkdir()
     (directory / "repair-tickets").mkdir()
 
@@ -546,7 +1108,7 @@ def cmd_init(args, stdout):
         "mode": mode,
         "status": "ACTIVE",
         "current_stage": "environment_check",
-        "next_action": "assignment",
+        "next_action": "requirement_intake",
         "active_agent": DEFAULT_STAGE_OWNERS["environment_check"],
         "stage_owners": DEFAULT_STAGE_OWNERS,
         "risk_tags": risk_tags,
@@ -557,6 +1119,15 @@ def cmd_init(args, stdout):
         "repair_tickets": f".loopx/runs/{run_id}/repair-tickets",
         "loop_attempts": {},
         "stages": {},
+        "interview": interview_state(run_id, mode),
+        "spec": spec_state(run_id),
+        "mode_decision": mode_decision_state(mode, risk_tags, "auto" if args.mode == "auto" else "user"),
+        "tracking": tracking_state(run_id),
+        "transition_policy": transition_policy_state(),
+        "git_gate": {
+            "status": "PENDING",
+            "diff_summary": "",
+        },
     }
     write_json(directory / "state.json", state)
     (directory / "worklist.yml").write_text(render_worklist(run_id, args.requirement, mode), encoding="utf-8")
@@ -564,6 +1135,9 @@ def cmd_init(args, stdout):
     (directory / "events.jsonl").write_text(json.dumps(event, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"created run {run_id}", file=stdout)
     print(f"mode: {mode}", file=stdout)
+    print(f"recommended mode: {mode}", file=stdout)
+    if args.mode == "auto":
+        print("mode selection: NEED_HUMAN", file=stdout)
     print(f"state: {state['worklist'].rsplit('/', 1)[0]}/state.json", file=stdout)
     return 0
 
@@ -576,6 +1150,9 @@ def cmd_status(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
+    if args.tracking:
+        print(format_tracking(state), end="", file=stdout)
+        return 0
     print(f"run_id: {state.get('run_id')}", file=stdout)
     print(f"mode: {state.get('mode')}", file=stdout)
     print(f"status: {state.get('status')}", file=stdout)
@@ -591,13 +1168,231 @@ def cmd_validate(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    errors = validate_run(project, run_id)
+    errors = validate_run(project, run_id, strict=args.strict)
     if errors:
         print(f"FAIL {run_id}", file=stdout)
         for error in errors:
             print(f"- {error}", file=stdout)
         return 1
     print(f"PASS {run_id}", file=stdout)
+    return 0
+
+
+def cmd_gate(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    errors = validate_run(project, run_id, strict=True)
+    if errors:
+        print(f"FAIL gate {run_id}", file=stdout)
+        print("strict validation: FAIL", file=stdout)
+        for error in errors:
+            print(f"- {error}", file=stdout)
+        return 1
+    print(f"PASS gate {run_id}", file=stdout)
+    print("strict validation: PASS", file=stdout)
+    return 0
+
+
+def cmd_close(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        state = load_state(project, run_id)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    if state.get("stages", {}).get("final_report") != "PASS":
+        print(f"FAIL close {run_id}", file=stdout)
+        print("- final_report must be PASS before close", file=stdout)
+        return 1
+    errors = validate_run(project, run_id, strict=True)
+    if errors:
+        print(f"FAIL close {run_id}", file=stdout)
+        print("- strict gate failed", file=stdout)
+        for error in errors:
+            print(f"- {error}", file=stdout)
+        return 1
+    state["status"] = "PASS"
+    state["current_stage"] = "final_report"
+    state["next_action"] = "closed"
+    evidence_path = get_run_dir(project, run_id) / "artifacts" / "close-evidence.json"
+    evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(evidence_path, build_close_evidence(project, run_id, state))
+    save_state(project, run_id, state)
+    try:
+        worklist_path, worklist = load_worklist(project, state)
+        worklist.setdefault("run", {})["status"] = "PASS"
+        worklist["run"]["current_stage"] = "final_report"
+        worklist["run"]["next_action"] = "closed"
+        worklist_path.write_text(dump_worklist(worklist), encoding="utf-8")
+    except (FileNotFoundError, YamlSubsetError):
+        pass
+    append_event(get_run_dir(project, run_id), {"type": "run_closed", "run_id": run_id})
+    print(f"PASS close {run_id}", file=stdout)
+    print("status: PASS", file=stdout)
+    return 0
+
+
+def cmd_git_gate(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        state = load_state(project, run_id)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    status, summary, reason = collect_git_status(project)
+    state["git_gate"] = {
+        "status": status,
+        "diff_summary": summary,
+        "reason": reason,
+    }
+    save_state(project, run_id, state)
+    append_event(get_run_dir(project, run_id), {
+        "type": "git_gate",
+        "status": status,
+        "reason": reason,
+    })
+    if status == "PASS":
+        print(f"PASS git gate {run_id}", file=stdout)
+        print(summary, file=stdout)
+        return 0
+    print(f"NEED_HUMAN git gate {run_id}", file=stdout)
+    print(f"- {reason}", file=stdout)
+    return 1
+
+
+def cmd_interview(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        state = load_state(project, run_id)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    artifact = project_path(project, state.setdefault("interview", interview_state(run_id, state.get("mode", ""))).get("artifact"))
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(render_interview_artifact(state), encoding="utf-8")
+    state["current_stage"] = "requirement_interview"
+    state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS)["requirement_interview"]
+    state["next_action"] = "record-stage --stage requirement_interview --status PASS"
+    state["interview"]["status"] = "IN_PROGRESS"
+    state["interview"]["unanswered_questions"] = interview_question_count(state.get("mode"))
+    save_state(project, run_id, state)
+    update_worklist_state(project, state, "requirement_interview", "IN_PROGRESS")
+    append_event(get_run_dir(project, run_id), {"type": "artifact_generated", "stage": "requirement_interview", "artifact": state["interview"]["artifact"]})
+    print(f"generated interview: {state['interview']['artifact']}", file=stdout)
+    print("current_stage: requirement_interview", file=stdout)
+    return 0
+
+
+def cmd_spec(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        state = load_state(project, run_id)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    if state.get("stages", {}).get("requirement_interview") not in PASSING_STATUSES:
+        print("FAIL spec blocked", file=stdout)
+        print("- requirement_interview must be PASS before spec_draft", file=stdout)
+        return 1
+    interview_artifact = project_path(project, state.setdefault("interview", interview_state(run_id, state.get("mode", ""))).get("artifact"))
+    if not interview_artifact.exists():
+        print("FAIL spec blocked", file=stdout)
+        print(f"- interview artifact is missing: {state['interview']['artifact']}", file=stdout)
+        return 1
+    spec = state.setdefault("spec", spec_state(run_id))
+    artifact = project_path(project, spec.get("artifact"))
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(render_spec_artifact(state), encoding="utf-8")
+    state["current_stage"] = "spec_draft"
+    state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS)["spec_draft"]
+    state["next_action"] = "record-stage --stage spec_draft --status PASS"
+    spec["status"] = "DRAFT"
+    spec["approved"] = False
+    spec["gate_result"] = "PENDING"
+    save_state(project, run_id, state)
+    update_worklist_state(project, state, "spec_draft", "IN_PROGRESS")
+    append_event(get_run_dir(project, run_id), {"type": "artifact_generated", "stage": "spec_draft", "artifact": spec["artifact"]})
+    print(f"generated spec: {spec['artifact']}", file=stdout)
+    print("current_stage: spec_draft", file=stdout)
+    return 0
+
+
+def cmd_mode(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        state = load_state(project, run_id)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    if state.get("stages", {}).get("spec_review") not in PASSING_STATUSES:
+        print("FAIL mode blocked", file=stdout)
+        print("- spec_review must be PASS before mode_selection", file=stdout)
+        return 1
+    selected = args.select
+    decision = state.setdefault("mode_decision", mode_decision_state(state.get("mode", selected), state.get("risk_tags", []), "auto"))
+    recommended = decision.get("recommended") or state.get("mode")
+    downgraded = mode_rank(recommended) > mode_rank(selected)
+    if downgraded and not args.accepted_risk:
+        print("FAIL mode blocked", file=stdout)
+        print("- accepted risk reason is required when selected mode is lower than recommended", file=stdout)
+        return 1
+    state["mode"] = selected
+    state["current_stage"] = "mode_selection"
+    state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS)["mode_selection"]
+    state["next_action"] = "solution_design"
+    decision["selected"] = selected
+    decision["selection_status"] = "CONFIRMED"
+    decision["selected_by"] = "user"
+    decision.setdefault("accepted_risk", {})
+    decision["accepted_risk"]["selected_lower_than_recommended"] = downgraded
+    decision["accepted_risk"]["reason"] = args.accepted_risk or ""
+    save_state(project, run_id, state)
+    status = "ACCEPTED_RISK" if downgraded else "PASS"
+    evidence = [args.accepted_risk] if args.accepted_risk else ["mode_decision"]
+    record_stage_result(project, run_id, "mode_selection", status, evidence, next_action="solution_design")
+    state = load_state(project, run_id)
+    update_worklist_state(project, state, "mode_selection", status)
+    print(f"mode selected: {selected}", file=stdout)
+    print(f"recommended mode: {recommended}", file=stdout)
+    print(f"stage_status: {status}", file=stdout)
+    return 0
+
+
+def cmd_next(args, stdout):
+    project = Path(args.project).resolve()
+    try:
+        run_id = resolve_run_id(project, args.run_id)
+        state = load_state(project, run_id)
+    except ValueError as exc:
+        print(str(exc), file=stdout)
+        return 1
+    current = state.get("current_stage")
+    if current not in STAGES:
+        print(f"FAIL current_stage is not known: {current}", file=stdout)
+        return 1
+    target = default_next_stage(current)
+    blockers = advance_blockers(project, run_id, state, target)
+    if blockers:
+        print("FAIL next blocked", file=stdout)
+        for blocker in blockers:
+            print(f"- {blocker}", file=stdout)
+        return 1
+    state["current_stage"] = target
+    state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(target, target)
+    state["next_action"] = default_next_stage(target)
+    save_state(project, run_id, state)
+    update_worklist_state(project, state, target, "IN_PROGRESS")
+    append_event(get_run_dir(project, run_id), {"type": "advanced", "to": target})
+    print(f"PASS advanced to {target}", file=stdout)
     return 0
 
 
@@ -616,6 +1411,8 @@ def cmd_record_stage(args, stdout):
             affected_work_items=args.item or [],
             blocked_reason=args.blocked_reason or "",
         )
+        state = load_state(project, run_id)
+        update_worklist_state(project, state, args.stage, args.status)
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
@@ -637,6 +1434,14 @@ def advance_blockers(project, run_id, state, target_stage):
     for stage in stages_before(target_stage):
         if stages.get(stage) not in PASSING_STATUSES:
             blockers.append(f"{stage} must be PASS before {target_stage}")
+    if target_stage == "spec_draft" and stages.get("requirement_interview") not in PASSING_STATUSES:
+        blockers.append("requirement_interview must be PASS before spec_draft")
+    if target_stage == "solution_design":
+        for stage in ("requirement_interview", "spec_review", "mode_selection"):
+            if stages.get(stage) not in PASSING_STATUSES:
+                message = f"{stage} must be PASS before solution_design"
+                if message not in blockers:
+                    blockers.append(message)
     if target_stage == "development" and stages.get("solution_review") not in PASSING_STATUSES:
         blockers.append("solution_review must be PASS before development")
     return blockers
@@ -833,7 +1638,7 @@ def cmd_close_repair(args, stdout):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="LoopX state controller.")
+    parser = argparse.ArgumentParser(description="LoopX 状态控制器。")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init = subparsers.add_parser("init", help="Create a local LoopX run state.")
@@ -846,13 +1651,52 @@ def build_parser():
 
     status = subparsers.add_parser("status", help="Show a LoopX run status.")
     status.add_argument("run_id", nargs="?")
+    status.add_argument("--tracking", action="store_true")
     status.add_argument("--project", default=".")
     status.set_defaults(func=cmd_status)
 
+    interview = subparsers.add_parser("interview", help="Generate the requirement interview artifact.")
+    interview.add_argument("run_id", nargs="?")
+    interview.add_argument("--project", default=".")
+    interview.set_defaults(func=cmd_interview)
+
+    spec = subparsers.add_parser("spec", help="Generate the requirement spec artifact after interview approval.")
+    spec.add_argument("run_id", nargs="?")
+    spec.add_argument("--project", default=".")
+    spec.set_defaults(func=cmd_spec)
+
+    mode = subparsers.add_parser("mode", help="Record the selected LoopX execution mode.")
+    mode.add_argument("run_id", nargs="?")
+    mode.add_argument("--select", required=True, choices=["LIGHT", "STANDARD", "FULL"])
+    mode.add_argument("--accepted-risk")
+    mode.add_argument("--project", default=".")
+    mode.set_defaults(func=cmd_mode)
+
+    next_stage = subparsers.add_parser("next", help="Advance to the default next stage when gates pass.")
+    next_stage.add_argument("run_id", nargs="?")
+    next_stage.add_argument("--project", default=".")
+    next_stage.set_defaults(func=cmd_next)
+
     validate = subparsers.add_parser("validate", help="Validate LoopX run state and worklist.")
     validate.add_argument("run_id", nargs="?")
+    validate.add_argument("--strict", action="store_true")
     validate.add_argument("--project", default=".")
     validate.set_defaults(func=cmd_validate)
+
+    gate = subparsers.add_parser("gate", help="Run the strict LoopX process gate.")
+    gate.add_argument("run_id", nargs="?")
+    gate.add_argument("--project", default=".")
+    gate.set_defaults(func=cmd_gate)
+
+    close_run = subparsers.add_parser("close", help="Close a LoopX run after the final report and strict gate pass.")
+    close_run.add_argument("run_id", nargs="?")
+    close_run.add_argument("--project", default=".")
+    close_run.set_defaults(func=cmd_close)
+
+    git_gate = subparsers.add_parser("git-gate", help="Record Git changed-file evidence for the final report gate.")
+    git_gate.add_argument("run_id", nargs="?")
+    git_gate.add_argument("--project", default=".")
+    git_gate.set_defaults(func=cmd_git_gate)
 
     record = subparsers.add_parser("record-stage", help="Record a machine-readable LoopX stage result.")
     record.add_argument("--run-id")

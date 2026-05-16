@@ -16,7 +16,13 @@
     },
     "status": {
       "type": "string",
-      "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK"]
+      "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK", "NEED_HUMAN"]
+    },
+    "mode": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
     },
     "return_to": {
       "type": "string"
@@ -35,6 +41,18 @@
       "items": {
         "type": "string"
       }
+    },
+    "tracking_snapshot": {
+      "type": "array"
+    },
+    "gate": {
+      "type": "object"
+    },
+    "inputs": {
+      "type": "array"
+    },
+    "outputs": {
+      "type": "array"
     },
     "user_confirmation_required": {
       "type": "boolean"
