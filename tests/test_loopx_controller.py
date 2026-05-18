@@ -27,6 +27,15 @@ class LoopxControllerTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
+    def run_dir(self, run_id):
+        return self.tmp / ".loopx" / "runs" / run_id
+
+    def read_state(self, run_id):
+        return json.loads((self.run_dir(run_id) / "state.json").read_text(encoding="utf-8"))
+
+    def write_state(self, run_id, state):
+        (self.run_dir(run_id) / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
     def test_init_creates_run_state_worklist_and_events(self):
         out = io.StringIO()
         code = self.controller.main([
@@ -654,6 +663,30 @@ LIGHT.
         state["git_gate"]["status"] = "PASS"
         state["git_gate"]["diff_summary"] = "M loopx/tools/loopx_controller.py"
         (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "strict-final-run",
+            "--stage",
+            "release_readiness",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/15-release-readiness.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        self.controller.main([
+            "confirm-stage",
+            "--run-id",
+            "strict-final-run",
+            "--stage",
+            "release_readiness",
+            "--evidence",
+            "user confirmed release readiness",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -842,6 +875,30 @@ LIGHT.
         state["git_gate"]["status"] = "PASS"
         state["git_gate"]["diff_summary"] = "M README.md"
         (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "close-run",
+            "--stage",
+            "release_readiness",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/15-release-readiness.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        self.controller.main([
+            "confirm-stage",
+            "--run-id",
+            "close-run",
+            "--stage",
+            "release_readiness",
+            "--evidence",
+            "user confirmed release readiness",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -1149,7 +1206,7 @@ LIGHT.
         self.assertIn("FAIL advance blocked", out.getvalue())
         self.assertIn("solution_review must be PASS before development", out.getvalue())
 
-    def test_can_write_business_requires_development_and_solution_review_pass(self):
+    def test_can_write_business_requires_development_solution_and_test_review_pass(self):
         self.controller.main([
             "init",
             "Business gate",
@@ -1178,6 +1235,7 @@ LIGHT.
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["current_stage"] = "development"
         state["stages"]["solution_review"] = "PASS"
+        state["stages"]["test_review"] = "PASS"
         (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
 
         out = io.StringIO()
@@ -1193,6 +1251,387 @@ LIGHT.
 
         self.assertEqual(code, 0)
         self.assertIn("PASS business writes unlocked", out.getvalue())
+
+    def test_confirmation_gate_record_pass_waits_for_confirm_stage_and_blocks_next(self):
+        self.controller.main([
+            "init",
+            "Solution review needs human confirmation",
+            "--run-id",
+            "confirm-solution-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        state = self.read_state("confirm-solution-run")
+        state["current_stage"] = "solution_review"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "PASS",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+        }
+        self.write_state("confirm-solution-run", state)
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "record-stage",
+            "--run-id",
+            "confirm-solution-run",
+            "--stage",
+            "solution_review",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/07-solution-review.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        run_dir = self.run_dir("confirm-solution-run")
+        state = self.read_state("confirm-solution-run")
+        result = json.loads((run_dir / "stage-results" / "07-solution-review.json").read_text(encoding="utf-8"))
+        worklist = (run_dir / "worklist.yml").read_text(encoding="utf-8")
+        self.assertEqual(state["stages"]["solution_review"], "NEED_HUMAN")
+        self.assertEqual(result["status"], "NEED_HUMAN")
+        self.assertEqual(result["agent_result"], "PASS")
+        self.assertTrue(result["user_confirmation_required"])
+        self.assertEqual(result["next_action"], "confirm-stage --stage solution_review")
+        self.assertIn("NEED_HUMAN solution_review", out.getvalue())
+        self.assertIn('stage: solution_review\n    name: "方案审核"\n    status: NEED_HUMAN', worklist)
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "next",
+            "confirm-solution-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("solution_review is waiting for user confirmation; run confirm-stage --stage solution_review", out.getvalue())
+
+    def test_confirm_stage_changes_waiting_gate_to_pass_and_allows_advance(self):
+        self.controller.main([
+            "init",
+            "Confirm solution review",
+            "--run-id",
+            "confirm-command-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        state = self.read_state("confirm-command-run")
+        state["current_stage"] = "solution_review"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "PASS",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+        }
+        self.write_state("confirm-command-run", state)
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "confirm-command-run",
+            "--stage",
+            "solution_review",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/07-solution-review.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "confirm-stage",
+            "--run-id",
+            "confirm-command-run",
+            "--stage",
+            "solution_review",
+            "--evidence",
+            "user confirmed",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        run_dir = self.run_dir("confirm-command-run")
+        state = self.read_state("confirm-command-run")
+        result = json.loads((run_dir / "stage-results" / "07-solution-review.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["stages"]["solution_review"], "PASS")
+        self.assertEqual(state["confirmations"]["solution_review"]["confirmation_evidence"], ["user confirmed"])
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["confirmed_by"], "user")
+        self.assertEqual(result["confirmation_evidence"], ["user confirmed"])
+        self.assertFalse(result["user_confirmation_required"])
+        self.assertIn("PASS confirmed solution_review", out.getvalue())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "next",
+            "confirm-command-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_state("confirm-command-run")["current_stage"], "test_design")
+        self.assertIn("PASS advanced to test_design", out.getvalue())
+
+    def test_test_review_waiting_confirmation_blocks_development_and_business_writes(self):
+        self.controller.main([
+            "init",
+            "Test review needs confirmation",
+            "--run-id",
+            "confirm-test-review-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        state = self.read_state("confirm-test-review-run")
+        state["current_stage"] = "test_review"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "PASS",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+            "solution_review": "PASS",
+            "test_design": "PASS",
+        }
+        self.write_state("confirm-test-review-run", state)
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "confirm-test-review-run",
+            "--stage",
+            "test_review",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/09-test-review.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "confirm-test-review-run",
+            "--to",
+            "development",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("test_review is waiting for user confirmation; run confirm-stage --stage test_review", out.getvalue())
+
+        state = self.read_state("confirm-test-review-run")
+        state["current_stage"] = "development"
+        self.write_state("confirm-test-review-run", state)
+        out = io.StringIO()
+        code = self.controller.main([
+            "can-write",
+            "--run-id",
+            "confirm-test-review-run",
+            "--kind",
+            "business",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("test_review is waiting for user confirmation; run confirm-stage --stage test_review", out.getvalue())
+
+    def test_code_review_waiting_confirmation_blocks_test_execution(self):
+        self.controller.main([
+            "init",
+            "Code review needs confirmation",
+            "--run-id",
+            "confirm-code-review-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        state = self.read_state("confirm-code-review-run")
+        state["current_stage"] = "code_review"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "PASS",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+            "solution_review": "PASS",
+            "test_design": "PASS",
+            "test_review": "PASS",
+            "development": "PASS",
+            "quality_audit": "PASS",
+        }
+        self.write_state("confirm-code-review-run", state)
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "confirm-code-review-run",
+            "--stage",
+            "code_review",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/12-code-review.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "next",
+            "confirm-code-review-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("code_review is waiting for user confirmation; run confirm-stage --stage code_review", out.getvalue())
+
+    def test_release_readiness_waits_after_health_gate_before_final_report(self):
+        self.controller.main([
+            "init",
+            "Release readiness confirms final report adoption",
+            "--run-id",
+            "confirm-release-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        state = self.read_state("confirm-release-run")
+        state["current_stage"] = "release_readiness"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "PASS",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+            "solution_review": "PASS",
+            "test_design": "PASS",
+            "test_review": "PASS",
+            "development": "PASS",
+            "quality_audit": "PASS",
+            "code_review": "PASS",
+            "test_execution": "PASS",
+            "health_gate": "PASS",
+        }
+        self.write_state("confirm-release-run", state)
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "confirm-release-run",
+            "--stage",
+            "release_readiness",
+            "--status",
+            "PASS",
+            "--evidence",
+            "stage-results/15-release-readiness.json",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "next",
+            "confirm-release-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("release_readiness is waiting for user confirmation; run confirm-stage --stage release_readiness", out.getvalue())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "confirm-stage",
+            "--run-id",
+            "confirm-release-run",
+            "--stage",
+            "release_readiness",
+            "--evidence",
+            "user adopted test report",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        out = io.StringIO()
+        code = self.controller.main([
+            "next",
+            "confirm-release-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_state("confirm-release-run")["current_stage"], "final_report")
+        self.assertIn("PASS advanced to final_report", out.getvalue())
+
+    def test_strict_validate_rejects_confirmed_gate_without_confirmation_metadata(self):
+        self.controller.main([
+            "init",
+            "Strict confirmation metadata",
+            "--run-id",
+            "strict-confirmation-run",
+            "--mode",
+            "LIGHT",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.run_dir("strict-confirmation-run")
+        state = self.read_state("strict-confirmation-run")
+        state["current_stage"] = "solution_review"
+        state["stages"]["solution_review"] = "PASS"
+        self.write_state("strict-confirmation-run", state)
+        self.controller.update_worklist_state(self.tmp, state, "solution_review", "PASS")
+        result = {
+            "stage": "solution_review",
+            "status": "PASS",
+            "mode": "LIGHT",
+            "summary": "",
+            "return_to": "",
+            "next_action": "test_design",
+            "affected_work_items": [],
+            "evidence": ["stage-results/07-solution-review.json"],
+            "tracking_snapshot": self.controller.build_tracking_snapshot(state),
+            "gate": {
+                "result": "PASS",
+                "blocking_issues": [],
+                "non_blocking_issues": [],
+            },
+            "user_confirmation_required": False,
+            "blocked_reason": "",
+        }
+        (run_dir / "stage-results" / "07-solution-review.json").write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "validate",
+            "strict-confirmation-run",
+            "--strict",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("solution_review PASS requires confirmation metadata", out.getvalue())
 
     def test_review_feedback_marks_changes_required_and_returns_to_stage(self):
         self.controller.main([

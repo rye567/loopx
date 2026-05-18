@@ -1,6 +1,6 @@
 # 03 方案审核
 
-- 状态：
+- 状态：NEED_HUMAN（agent 审核通过后等待用户确认）
 - 审核结论：
 - 问题列表：
 - 项目规则符合性：
@@ -13,12 +13,12 @@
 ```yaml
 stage_result:
   stage: "03 方案审核"
-  status:
+  status: NEED_HUMAN
   return_to:
-  next_action:
+  next_action: confirm-stage --stage solution_review
   affected_work_items: []
   evidence: []
-  user_confirmation_required:
+  user_confirmation_required: true
   blocked_reason:
 ```
 

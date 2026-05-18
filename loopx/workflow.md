@@ -42,6 +42,8 @@
 - 代码审查通过后，确认是否进入测试执行。
 - 测试执行通过后，先执行 `/health`，再确认是否结束并采纳测试报告。
 
+控制器层面使用中间状态强制表达该门禁：agent 在 `solution_review`、`test_review`、`code_review` 或 `release_readiness` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。最终采纳确认落在 `release_readiness`：`test_execution PASS -> health_gate PASS -> release_readiness NEED_HUMAN -> confirm-stage -> release_readiness PASS -> final_report`。
+
 如果用户明确说“本次全自动”“跳过人工确认”或“恢复自动推进”，才可以取消本次确认门。高风险动作仍必须单独确认。
 
 ## 阶段
@@ -105,15 +107,15 @@ stage_result:
 | 4 Spec 审核 | 5 执行等级选择 | 3 Spec 草稿 | 等用户处理规格争议 |
 | 5 执行等级选择 | 6 方案设计 | 5 执行等级选择 | 等用户确认执行等级或 accepted risk |
 | 6 方案设计 | 7 方案审核 | 6 方案设计 | 等用户决策 |
-| 7 方案审核 | 等用户确认后到 8 | 6 方案设计 | 等用户处理 |
+| 7 方案审核 | NEED_HUMAN，`confirm-stage` 后到 8 | 6 方案设计 | 等用户处理 |
 | 8 测试用例设计 | 9 测试用例审核 | 8 测试用例设计 | 等用户处理 |
-| 9 测试用例审核 | 等用户确认后到 10 | 8 测试用例设计 | 等用户处理 |
+| 9 测试用例审核 | NEED_HUMAN，`confirm-stage` 后到 10 | 8 测试用例设计 | 等用户处理 |
 | 10 开发 | 11 通用质量审计 | 10 开发 | 等用户处理 |
 | 11 通用质量审计 | 12 代码审查 | 6/8/10，按失败原因选择 | 等用户处理 |
-| 12 代码审查 | 等用户确认后到 13 | 10 开发 | 等用户处理 |
+| 12 代码审查 | NEED_HUMAN，`confirm-stage` 后到 13 | 10 开发 | 等用户处理 |
 | 13 测试执行 | 14 健康门 | 8/10，按失败原因选择 | 等用户处理 |
 | 14 健康门 | 15 发布就绪 | 对应责任阶段 | 等用户处理 |
-| 15 发布就绪 | 16 最终报告 | 对应责任阶段 | 等用户处理 |
+| 15 发布就绪 | NEED_HUMAN，`confirm-stage` 后到 16 | 对应责任阶段 | 等用户处理 |
 | 16 最终报告 | 完成 | 对应责任阶段 | 等用户处理 |
 
 审核失败反馈规则：
@@ -164,15 +166,17 @@ python tools/loopx_controller.py git-gate <run_id>
 python tools/loopx_controller.py close <run_id>
 python tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
 python tools/loopx_controller.py advance --to solution_review
+python tools/loopx_controller.py record-stage --stage solution_review --status PASS --evidence stage-results/07-solution-review.json
+python tools/loopx_controller.py confirm-stage --stage solution_review --evidence "user confirmed solution review"
 python tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
 python tools/loopx_controller.py claim-stage solution_design
 python tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 python tools/loopx_controller.py can-write --kind business
 ```
 
-控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。
+控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
 
-`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
+`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 和 `test_review` 都必须已确认通过。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
 
 ## 本地执行硬约束
 

@@ -5,7 +5,7 @@ description: 当用户要求 LoopX、质量门、阶段化工程审核、完整 
 
 # LoopX
 
-LoopX 是跨 Codex 和 Claude Code 的工程质量门 skill。`loopx/` 目录就是唯一主源；用 Git 维护和更新，不再生成任何工具专属适配层。
+跨 Codex 和 Claude Code 的工程质量门 skill。`loopx/` 是唯一主源；完整流程契约见 `workflow.md`。
 
 ## 不可跳过规则
 
@@ -14,26 +14,16 @@ LoopX 是跨 Codex 和 Claude Code 的工程质量门 skill。`loopx/` 目录就
 ```bash
 python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
 python loopx/tools/loopx_controller.py status --tracking
-python loopx/tools/loopx_controller.py interview <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
-python loopx/tools/loopx_controller.py spec <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py mode <run_id> --select FULL
-python loopx/tools/loopx_controller.py next <run_id>
-python loopx/tools/loopx_controller.py gate <run_id>
-python loopx/tools/loopx_controller.py git-gate <run_id>
-python loopx/tools/loopx_controller.py close <run_id>
 ```
 
-2. 只能用 `interview`、`spec`、`mode --select ...` 生成或确认前置门产物，用 `record-stage` 写入阶段结论，用 `advance --to ...` 或 `next` 进入下一阶段；不要手改 `state.json` 把阶段伪造成 `PASS`。
-3. `solution_review` 未 `PASS` 前禁止开发；任何业务代码编辑前必须运行：
+2. 只能用控制器推进：`interview`、`spec`、`mode --select ...`、`record-stage`、`confirm-stage`、`advance --to ...` 或 `next`。不要手改 `state.json` 把阶段伪造成 `PASS`。
+3. `solution_review` 和 `test_review` 未经 `confirm-stage` 变为 `PASS` 前禁止开发；业务写入前必须运行：
 
 ```bash
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-4. Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须创建返工任务并回到被评审阶段 owner agent；不得只手改 `current_stage`：
+4. Review 不通过或用户指出问题时，必须创建返工任务并回到 owner 阶段：
 
 ```bash
 python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
@@ -41,63 +31,47 @@ python loopx/tools/loopx_controller.py claim-stage solution_design
 python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 ```
 
-5. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行必须有阶段 `PASS`、写入闸门 `PASS` 和 health gate 证据。
+5. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行还需要阶段 `PASS`、写入闸门、health gate 和未覆盖项说明。
+6. 确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage <stage> --evidence "..."` 才能继续。
 
 ## 入口
 
-- Codex 中使用 `$loopx ...` 触发。
-- Claude Code 中使用 `/loopx ...` 触发。
-- 用户提到“质量门”“完整 loop”“阶段化开发”“跨模块”“SQL/MQ”“权限”“租户”“核心状态流转”或高风险改动时，优先判断是否进入 LoopX。
+- Codex：`$loopx ...`
+- Claude Code：`/loopx ...`
+- 命中质量门、完整 loop、阶段化开发、跨模块、SQL/MQ、权限、租户或核心状态流转时，优先判断是否进入 LoopX。
 
 ## 必读资源
 
-计划或编辑前先读取这些资源：
-
-- `workflow.md`：阶段化质量门主流程。
-- `project-harness.md`：项目发现和默认 harness 规则。
-- `risk.yml`、`health.yml`、`project-profiles.yml`：风险、健康检查和项目 profile 策略。
-- `agents/`：各质量角色的职责边界。
+- `workflow.md`：唯一完整流程契约。
+- `project-harness.md`：项目发现和默认 harness。
+- `risk.yml`、`health.yml`、`project-profiles.yml`：风险、健康检查和 profile 策略。
+- `agents/`：阶段角色边界。
 - `templates/`：阶段文档模板。
-- `schemas/`：运行状态、阶段结果、worklist、health 结果，以及 interview/spec/mode/tracking 前置门禁结构契约。
+- `schemas/`：state、stage-result、worklist、health、interview、spec、mode、tracking 契约。
+- `tools/loopx_controller.py`：本地状态控制器。
 
 ## 执行流程
 
-1. 先从当前项目的 README、构建文件、主配置、源码结构和测试目录完成项目发现。
-2. 按 `risk.yml` 准备风险标签，并用 `init --mode auto --risk-tags ...` 让控制器判定 `LIGHT`、`STANDARD` 或 `FULL`。
-3. 按 `workflow.md` 的阶段顺序推进，并在每个阶段读取 `agents/` 中对应角色说明。
-4. 当执行深度要求阶段产物时，使用 `templates/` 输出阶段文档。
-5. 每个阶段结束后写入 `stage-results/*.json`，再用 `advance --to ...` 检查能否进入下一阶段；若存在未关闭的返工任务，先 `claim-stage` 修原产物并 `close-repair`。
-6. 最终结论必须区分本地验证结果、环境阻塞、未覆盖项和需要 CI/远端验证的部分。
+1. 做项目发现：README、构建文件、主配置、源码结构和测试目录。
+2. 按 `risk.yml` 准备风险标签，用 `init --mode auto --risk-tags ...` 选择执行深度。
+3. 按 `workflow.md` 阶段顺序推进；每阶段读取对应 `agents/`、必要时使用 `templates/`。
+4. 阶段结束写入 `stage-results/*.json`；确认门停在 `NEED_HUMAN`，用户确认后用 `confirm-stage` 转为 `PASS`。
+5. 进入下一阶段前用 `advance --to ...` 或 `next`；最终用 `gate`、`git-gate`、`close` 收口。
+6. 最终结论区分本地通过、本地阻塞、未覆盖/需 CI 验证。
 
 ## 状态控制器
 
-需要持久化本地运行状态时，优先使用随 skill 附带的控制器脚本：
+常用命令索引：
 
 ```bash
-python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
-python loopx/tools/loopx_controller.py status
 python loopx/tools/loopx_controller.py status --tracking
-python loopx/tools/loopx_controller.py interview <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
-python loopx/tools/loopx_controller.py spec <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py mode <run_id> --select FULL
-python loopx/tools/loopx_controller.py next <run_id>
-python loopx/tools/loopx_controller.py validate
 python loopx/tools/loopx_controller.py validate --strict
 python loopx/tools/loopx_controller.py gate <run_id>
 python loopx/tools/loopx_controller.py git-gate <run_id>
 python loopx/tools/loopx_controller.py close <run_id>
-python loopx/tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
-python loopx/tools/loopx_controller.py advance --to solution_review
-python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
-python loopx/tools/loopx_controller.py claim-stage solution_design
-python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
-python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-如果当前工作目录就是 skill 目录，使用相对路径即可，例如 `python tools/loopx_controller.py validate`。
+如果当前工作目录就是 skill 目录，使用相对路径，例如 `python tools/loopx_controller.py validate`。完整命令流以 `workflow.md` 为准。
 
 ## 项目接入
 

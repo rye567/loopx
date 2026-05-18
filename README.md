@@ -1,55 +1,24 @@
 # LoopX Kit
 
-## 前置门禁最小闭环
-
-LoopX 现在会在实现前持久化早期交付门禁：
-
-```bash
-python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags api_contract
-python loopx/tools/loopx_controller.py status --tracking
-python loopx/tools/loopx_controller.py interview <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
-python loopx/tools/loopx_controller.py spec <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py mode <run_id> --select FULL
-python loopx/tools/loopx_controller.py next <run_id>
-python loopx/tools/loopx_controller.py validate --strict
-python loopx/tools/loopx_controller.py gate <run_id>
-python loopx/tools/loopx_controller.py git-gate <run_id>
-python loopx/tools/loopx_controller.py close <run_id>
-```
-
-新运行会包含 `artifacts/`、需求采访/规格元数据、`mode_decision`、流转策略，以及写入 `worklist.yml` 的阶段追踪列表。`advance --to solution_design` 会在 `requirement_interview`、`spec_review` 和 `mode_selection` 通过前被阻止。
-
-LoopX Kit 是一个用 Git 维护的跨工具工程质量门 skill 包。`loopx/` 是唯一主源，可分别安装到 Codex 和 Claude Code 的 skills 目录；更新时只需要对本仓库执行 `git pull`。
+LoopX Kit 是用 Git 维护的跨工具工程质量门 skill 包。`loopx/` 是唯一主源，可安装到 Codex 或 Claude Code 的 skills 目录；完整流程契约见 `loopx/workflow.md`。
 
 ## 安装
-
-克隆仓库：
 
 ```bash
 git clone git@github.com:rye567/loopx-kit.git
 cd loopx-kit
 ```
 
-把 `loopx/` 目录复制或符号链接到目标工具的 skills 目录，并保留目录名为 `loopx`。Codex 和 Claude Code 各自按自己的 skill 机制安装即可；本仓库不再生成工具专属适配层。
+把 `loopx/` 目录复制或符号链接到目标工具的 skills 目录，并保留目录名为 `loopx`。本仓库不再生成工具专属适配层。
 
 ## 使用
 
-在 Codex 使用：
-
 ```text
-$loopx 处理需求：...
+Codex: $loopx 处理需求：...
+Claude Code: /loopx 处理需求：...
 ```
 
-在 Claude Code 使用：
-
-```text
-/loopx 处理需求：...
-```
-
-项目内如需提示入口，可以手动加入一小段说明：
+项目内如需提示入口，可以加入：
 
 ```text
 当用户要求 LoopX、质量门或完整阶段化交付时，使用已安装的 loopx skill；先读取当前项目 README、构建文件、主要配置和测试目录，再按 LoopX 阶段执行。
@@ -57,33 +26,21 @@ $loopx 处理需求：...
 
 ## 状态控制器
 
-LoopX 也提供一个本地状态控制器，用于把运行过程从纯提示词约束推进到可校验状态文件：
+控制器把运行过程持久化到 `.loopx/runs/<run_id>/`，包括 `state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `repair-tickets/`。完整命令流见 `loopx/workflow.md`；常用入口如下：
 
 ```bash
-python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
-python loopx/tools/loopx_controller.py status
+python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags api_contract
 python loopx/tools/loopx_controller.py status --tracking
-python loopx/tools/loopx_controller.py interview <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
-python loopx/tools/loopx_controller.py spec <run_id>
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python loopx/tools/loopx_controller.py mode <run_id> --select FULL
-python loopx/tools/loopx_controller.py next <run_id>
-python loopx/tools/loopx_controller.py validate
 python loopx/tools/loopx_controller.py validate --strict
 python loopx/tools/loopx_controller.py gate <run_id>
-python loopx/tools/loopx_controller.py git-gate <run_id>
-python loopx/tools/loopx_controller.py close <run_id>
-python loopx/tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
-python loopx/tools/loopx_controller.py advance --to solution_review
-python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
-python loopx/tools/loopx_controller.py claim-stage solution_design
-python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
-python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-控制器会创建 `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `repair-tickets/`。`validate` 只校验结构合法性；`gate` 运行严格流程门；`git-gate` 读取本地 Git 变更并写入 diff summary；`close` 在最终报告和严格门都通过后关闭整个 run，并生成 `artifacts/close-evidence.json`。阶段推进、review 返工和业务写入必须分别通过 `advance`、`fail-review`/`claim-stage`/`close-repair` 与 `can-write` 闸门。控制器只依赖 Python 标准库。
+确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`，必须用 `confirm-stage` 写入用户确认后才变为 `PASS`。业务写入要求 `solution_review` 和 `test_review` 都已确认通过：
+
+```bash
+python loopx/tools/loopx_controller.py confirm-stage --stage solution_review --evidence "user confirmed solution review"
+python loopx/tools/loopx_controller.py can-write --kind business
+```
 
 ## 更新
 
@@ -97,6 +54,4 @@ LoopX 不依赖 `/data`、`/usr/bin/python3`、`~/.local/bin` 等单一平台路
 
 ## 仓库策略
 
-本仓库可以设为 public，方便其它机器直接安装。公开可见不等于允许任何人写入；建议保护 `main` 分支，只允许通过 PR 合并，并要求所有者审批。
-
-本项目暂未声明开源许可证。公开仓库默认仍保留作者权利；如果后续要开放复用/改造/商用，请再补充明确的 `LICENSE`。
+建议保护 `main` 分支，只允许通过 PR 合并，并要求所有者审批。本项目暂未声明开源许可证；公开可见不等于自动授权复用、改造或商用。

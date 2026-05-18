@@ -51,14 +51,18 @@ post_release_checks: []
 
 -
 
+## 人工确认
+
+本阶段用于承接测试执行和健康门之后的最终人工采纳确认。agent 判断可发布时记录为 `NEED_HUMAN`；用户确认后通过 `confirm-stage --stage release_readiness` 变为 `PASS`，再进入最终报告。
+
 ## 阶段结果
 
 ```yaml
 stage_result:
   stage: release_readiness
-  status: PASS|CHANGES_REQUIRED|BLOCKED|ACCEPTED_RISK
+  status: NEED_HUMAN|CHANGES_REQUIRED|BLOCKED|ACCEPTED_RISK
   return_to: release_readiness
-  next_action: final_report
+  next_action: confirm-stage --stage release_readiness
   affected_work_items: []
   evidence: []
   user_confirmation_required: true
