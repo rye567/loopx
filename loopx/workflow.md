@@ -8,7 +8,7 @@
 
 默认行为：
 
-1. 必须先完成环境检查、项目分配和风险分级；未显式输出 `mode: LIGHT|STANDARD|FULL` 前，不得写业务代码、测试、配置或 SQL。
+1. `init` 必须自动完成环境检查并落库 `environment_check PASS`；未显式输出 `mode: LIGHT|STANDARD|FULL` 前，不得写业务代码、测试、配置或 SQL。
 2. 阶段状态只允许 `PASS`、`CHANGES_REQUIRED`、`BLOCKED`、`SKIPPED`、`ACCEPTED_RISK`、`NEED_HUMAN`；`SKIPPED` 仅允许显式 `LIGHT` 或配置允许，`ACCEPTED_RISK` 仅允许用户明确接受风险。
 3. 除 `PASS`、合法 `SKIPPED` 或用户明确 `ACCEPTED_RISK` 外，不得进入下一阶段。
 4. 同一阶段最多自动返工 2 次，第 3 次仍失败则 `BLOCKED`。
@@ -37,20 +37,21 @@
 
 以下阶段 `PASS` 后必须等待用户确认，不得全自动继续：
 
+- 需求采访必须先向用户输出问题，收集回答并更新 `interview.md`；未回答时不得记录 `PASS`。
 - 方案审核通过后，确认是否进入测试用例设计。
 - 测试用例审核通过后，确认是否进入开发阶段。
 - 代码审查通过后，确认是否进入测试执行。
 - 测试执行通过后，先执行 `/health`，再确认是否结束并采纳测试报告。
 
-控制器层面使用中间状态强制表达该门禁：agent 在 `solution_review`、`test_review`、`code_review` 或 `release_readiness` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。最终采纳确认落在 `release_readiness`：`test_execution PASS -> health_gate PASS -> release_readiness NEED_HUMAN -> confirm-stage -> release_readiness PASS -> final_report`。
+控制器层面使用中间状态强制表达该门禁：agent 在 `requirement_interview`、`solution_review`、`test_review`、`code_review` 或 `release_readiness` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。需求采访确认是生成 Spec 的前置门：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。最终采纳确认落在 `release_readiness`：`test_execution PASS -> health_gate PASS -> release_readiness NEED_HUMAN -> confirm-stage -> release_readiness PASS -> final_report`。
 
 如果用户明确说“本次全自动”“跳过人工确认”或“恢复自动推进”，才可以取消本次确认门。高风险动作仍必须单独确认。
 
 ## 阶段
 
-0. 环境检查：JDK/语言运行时、构建工具、目标模块、验证命令、依赖服务可用性。
+0. 环境检查：由 controller 在 `init` 时自动执行并记录为 `PASS`；覆盖项目根、Python controller 运行时和基础状态目录。JDK/语言运行时、构建工具、目标模块、验证命令和依赖服务缺口可在后续阶段继续补充为阻塞证据。
 1. 需求接收：记录原始需求、范围线索和初始风险。
-2. 需求采访：确认业务规则、验收标准、边界情况和开放问题。
+2. 需求采访：根据原始问题或需求向用户提问，确认业务规则、验收标准、边界情况和开放问题；未得到回答不得生成或通过 Spec。
 3. Spec 草稿：把采访结果沉淀为可测试的需求规格。
 4. Spec 审核：检查完整性、歧义、范围和可测试性。
 5. 执行等级选择：确认 `LIGHT`、`STANDARD` 或 `FULL`，记录 accepted risk。
@@ -100,9 +101,9 @@ stage_result:
 
 | 当前阶段 | `PASS` 后 | `CHANGES_REQUIRED` 后 | `BLOCKED` 后 |
 |---|---|---|---|
-| 0 环境检查 | 1 需求接收 | 0 环境检查 | 等用户处理环境/权限/依赖 |
+| 0 环境检查 | 自动 PASS 到 1 需求接收 | 0 环境检查 | 等用户处理环境/权限/依赖 |
 | 1 需求接收 | 2 需求采访 | 1 需求接收 | 等用户澄清原始需求 |
-| 2 需求采访 | 3 Spec 草稿 | 2 需求采访 | 等用户补充关键问题 |
+| 2 需求采访 | NEED_HUMAN，`confirm-stage` 后到 3 | 2 需求采访 | 等用户补充关键问题 |
 | 3 Spec 草稿 | 4 Spec 审核 | 3 Spec 草稿 | 等用户处理规格阻塞 |
 | 4 Spec 审核 | 5 执行等级选择 | 3 Spec 草稿 | 等用户处理规格争议 |
 | 5 执行等级选择 | 6 方案设计 | 5 执行等级选择 | 等用户确认执行等级或 accepted risk |
@@ -153,7 +154,9 @@ python tools/loopx_controller.py init "需求描述" --mode auto --risk-tags ten
 python tools/loopx_controller.py status
 python tools/loopx_controller.py status --tracking
 python tools/loopx_controller.py interview <run_id>
+# 回答 interview 命令输出的问题，并把回答写入 .loopx/runs/<run_id>/artifacts/interview.md 后才能记录 PASS
 python tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
+python tools/loopx_controller.py confirm-stage --run-id <run_id> --stage requirement_interview --evidence "user confirmed interview"
 python tools/loopx_controller.py spec <run_id>
 python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
 python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
@@ -174,7 +177,7 @@ python tools/loopx_controller.py close-repair --item W1 --artifact stage-results
 python tools/loopx_controller.py can-write --kind business
 ```
 
-控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
+控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`init` 会自动写入 `stage-results/00-environment-check.json` 并把当前阶段推进到 `requirement_intake`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
 
 `validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 和 `test_review` 都必须已确认通过。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
 

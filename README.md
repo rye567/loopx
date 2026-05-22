@@ -35,9 +35,14 @@ python loopx/tools/loopx_controller.py validate --strict
 python loopx/tools/loopx_controller.py gate <run_id>
 ```
 
+`init` 会自动执行环境检查，写入 `stage-results/00-environment-check.json`，并把当前阶段推进到 `requirement_intake`，不需要人工确认。
+
+`interview` 会把需求采访问题输出给用户；必须把用户回答写入 `interview.md`，且文件不再包含“待用户回答/未回答”等占位后，才能记录 `requirement_interview PASS`。
+
 确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`，必须用 `confirm-stage` 写入用户确认后才变为 `PASS`。业务写入要求 `solution_review` 和 `test_review` 都已确认通过：
 
 ```bash
+python loopx/tools/loopx_controller.py confirm-stage --stage requirement_interview --evidence "user confirmed interview"
 python loopx/tools/loopx_controller.py confirm-stage --stage solution_review --evidence "user confirmed solution review"
 python loopx/tools/loopx_controller.py can-write --kind business
 ```

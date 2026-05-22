@@ -1,5 +1,7 @@
 # 01 需求采访
 
+需求采访不是生成模板文件；必须先把阻塞规格生成的问题展示给用户，并把用户回答写入本文件。
+
 ## 上下文
 
 - 运行 ID：
@@ -22,8 +24,8 @@
 ## 回答记录
 
 - 问题：
-  回答：
-  状态：已确认 | 假设 | 未关闭
+  回答：待用户回答
+  状态：未回答 | 已确认 | 假设
 
 ## 开放问题
 
@@ -38,14 +40,16 @@
 
 ## 采访门禁
 
+仍含“待用户回答”“未回答”或“待确认”时，不得记录 `PASS`。
+
 ```yaml
 stage_result:
   stage: requirement_interview
-  status: PASS
+  status: NEED_HUMAN
   return_to: ""
-  next_action: spec_draft
+  next_action: confirm-stage --stage requirement_interview
   affected_work_items: []
   evidence: []
-  user_confirmation_required: false
+  user_confirmation_required: true
   blocked_reason: ""
 ```

@@ -2,7 +2,7 @@
 
 ## 职责
 
-澄清业务目标、用户场景、影响范围、约束和验收口径；只做访谈和整理，不做方案设计，不替用户决定需求。
+澄清业务目标、用户场景、影响范围、约束和验收口径；必须根据原始问题向用户提问并整理回答，不做方案设计，不替用户决定需求。
 
 ## 输入
 
@@ -14,14 +14,17 @@
 ## 输出
 
 - 结构化访谈记录：已确认事实、用户选择、待确认问题、范围、非目标、验收草案和风险。
-- `stage_result`，状态为 `PASS`、`CHANGES_REQUIRED` 或 `BLOCKED`。
+- `stage_result`；访谈满足放行条件时通过控制器记录 `PASS`，实际落库为 `NEED_HUMAN`，等待用户确认后才允许生成规格。
 
 ## 门禁
 
 - 目标、影响范围或关键验收标准未明确时返回 `CHANGES_REQUIRED` 或 `BLOCKED`。
+- 必须把阻塞规格生成的问题展示给用户；未得到回答时不得记录 `PASS`。
 - 涉及 API、SQL、MQ、权限、租户、核心状态或跨模块时必须标记风险。
 - 无法确认的信息进入待确认问题，不得写成事实。
+- `interview.md` 仍包含“待用户回答”“未回答”“待确认”等占位时不得放行。
 - 输出必须能支撑 spec-writer 编写规格。
+- 访谈记录 `PASS` 后必须等待 `confirm-stage --stage requirement_interview`，不得自行继续生成 Spec。
 
 ## 禁止事项
 
@@ -42,7 +45,7 @@ requirement_interview:
   risk_tags: []
   stage_result:
     stage: requirement_interview
-    status: PASS
-    next_action: write_spec
+    status: NEED_HUMAN
+    next_action: confirm-stage --stage requirement_interview
     evidence: []
 ```

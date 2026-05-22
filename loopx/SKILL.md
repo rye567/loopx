@@ -9,7 +9,7 @@ description: 当用户要求 LoopX、质量门、阶段化工程审核、完整 
 
 ## 不可跳过规则
 
-1. 先初始化状态机，不要手工猜执行深度：
+1. 先初始化状态机，不要手工猜执行深度；环境检查由控制器在 `init` 时自动执行并记录为 `PASS`，不得等待人工确认：
 
 ```bash
 python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
@@ -17,13 +17,14 @@ python loopx/tools/loopx_controller.py status --tracking
 ```
 
 2. 只能用控制器推进：`interview`、`spec`、`mode --select ...`、`record-stage`、`confirm-stage`、`advance --to ...` 或 `next`。不要手改 `state.json` 把阶段伪造成 `PASS`。
-3. `solution_review` 和 `test_review` 未经 `confirm-stage` 变为 `PASS` 前禁止开发；业务写入前必须运行：
+3. `interview` 必须把问题展示给用户，并把用户回答写入 `interview.md`；空采访或仍含“待用户回答/未回答”的采访不得记录 `PASS`。
+4. `solution_review` 和 `test_review` 未经 `confirm-stage` 变为 `PASS` 前禁止开发；业务写入前必须运行：
 
 ```bash
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-4. Review 不通过或用户指出问题时，必须创建返工任务并回到 owner 阶段：
+5. Review 不通过或用户指出问题时，必须创建返工任务并回到 owner 阶段：
 
 ```bash
 python loopx/tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
@@ -31,8 +32,8 @@ python loopx/tools/loopx_controller.py claim-stage solution_design
 python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 ```
 
-5. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行还需要阶段 `PASS`、写入闸门、health gate 和未覆盖项说明。
-6. 确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage <stage> --evidence "..."` 才能继续。
+6. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行还需要阶段 `PASS`、写入闸门、health gate 和未覆盖项说明。
+7. 确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage <stage> --evidence "..."` 才能继续。
 
 ## 入口
 
@@ -52,10 +53,10 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 
 ## 执行流程
 
-1. 做项目发现：README、构建文件、主配置、源码结构和测试目录。
+1. 做项目发现：README、构建文件、主配置、源码结构和测试目录；`init` 后环境检查应已自动 `PASS`，当前阶段进入 `requirement_intake`。
 2. 按 `risk.yml` 准备风险标签，用 `init --mode auto --risk-tags ...` 选择执行深度。
-3. 按 `workflow.md` 阶段顺序推进；每阶段读取对应 `agents/`、必要时使用 `templates/`。
-4. 阶段结束写入 `stage-results/*.json`；确认门停在 `NEED_HUMAN`，用户确认后用 `confirm-stage` 转为 `PASS`。
+3. 按 `workflow.md` 阶段顺序推进；每阶段读取对应 `agents/`、必要时使用 `templates/`；需求采访阶段必须先向用户提问并等待回答。
+4. 阶段结束写入 `stage-results/*.json`；`requirement_interview` 和各审核确认门停在 `NEED_HUMAN`，用户确认后用 `confirm-stage` 转为 `PASS`。
 5. 进入下一阶段前用 `advance --to ...` 或 `next`；最终用 `gate`、`git-gate`、`close` 收口。
 6. 最终结论区分本地通过、本地阻塞、未覆盖/需 CI 验证。
 
@@ -82,4 +83,5 @@ python loopx/tools/loopx_controller.py close <run_id>
 - 不为通过流程而降低断言、跳过证据、隐藏失败或伪造 `PASS`。
 - 高风险动作仍需显式确认，包括 git commit/push、强推、生产/联调写入、破坏性删除和真实外部系统调用。
 - 遇到已有用户改动时协同处理，不得无授权回滚。
+- 需求采访未经实际提问、回答写入和用户 `confirm-stage --stage requirement_interview` 确认前，不得生成或通过 Spec。
 - 没有硬证据时，最终报告必须写明未覆盖或需要 CI 验证。

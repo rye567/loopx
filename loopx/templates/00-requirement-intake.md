@@ -51,7 +51,7 @@ stage_result:
   stage: requirement_intake
   status: PASS|CHANGES_REQUIRED|BLOCKED
   return_to: requirement_intake
-  next_action: environment_check
+  next_action: requirement_interview
   affected_work_items: []
   evidence: []
   user_confirmation_required: false

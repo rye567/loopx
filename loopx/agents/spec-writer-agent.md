@@ -6,7 +6,7 @@
 
 ## 输入
 
-- requirement-interviewer-agent 的访谈记录。
+- requirement-interviewer-agent 的访谈记录，且必须是已向用户提问并写入回答后的记录。
 - requirement-manager 的需求判断和风险线索。
 - 用户确认的业务事实、边界和非目标。
 - 项目标准、模板、workflow、risk 配置和 harness。
@@ -20,6 +20,7 @@
 ## 门禁
 
 - 区分已确认事实和待确认假设。
+- `requirement_interview` 未确认、访谈仍有未回答问题或 `interview.md` 仍含模板占位时，不得生成 Spec。
 - 验收标准必须可验证。
 - 需求缺口、冲突或不可验证项返回 `CHANGES_REQUIRED` 或 `BLOCKED`。
 - 高风险标签必须保留给后续模式选择和评审。

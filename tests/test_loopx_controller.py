@@ -36,6 +36,66 @@ class LoopxControllerTest(unittest.TestCase):
     def write_state(self, run_id, state):
         (self.run_dir(run_id) / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
 
+    def answer_interview_artifact(self, run_id):
+        artifact = self.run_dir(run_id) / "artifacts" / "interview.md"
+        artifact.write_text("""# 需求采访
+
+## 运行信息
+
+- 运行 ID：{run_id}
+
+## 已确认事实
+
+- 用户确认了要解决的问题、期望行为、验收标准和范围边界。
+
+## 采访问题
+
+| 优先级 | 问题 | 为什么需要 | 阻塞阶段 |
+|---|---|---|---|
+| P0 | 这个需求要解决的具体问题是什么？ | 确认问题定义 | spec_draft |
+
+## 回答记录
+
+- 问题：这个需求要解决的具体问题是什么？
+  回答：解决指定需求，并以可验证验收标准收口。
+  状态：已确认
+- 问题：验收标准是什么？
+  回答：核心行为可由测试或明确检查证明。
+  状态：已确认
+- 问题：哪些内容不在本次范围内？
+  回答：未声明的新框架和无关重构不在范围内。
+  状态：已确认
+
+## 开放问题
+
+- 阻塞问题：无
+- 非阻塞问题：无
+""".format(run_id=run_id), encoding="utf-8")
+
+    def force_interview_pass_state(self, run_id, unanswered_questions):
+        run_dir = self.run_dir(run_id)
+        state = self.read_state(run_id)
+        state.setdefault("stages", {})["requirement_interview"] = "PASS"
+        state.setdefault("interview", {})["status"] = "PASS"
+        state["interview"]["unanswered_questions"] = unanswered_questions
+        self.write_state(run_id, state)
+        result = self.controller.build_stage_result(
+            state,
+            "requirement_interview",
+            "PASS",
+            "PASS",
+            "",
+            "spec_draft",
+            [f".loopx/runs/{run_id}/artifacts/interview.md"],
+            [],
+            "",
+        )
+        (run_dir / "stage-results" / "02-requirement-interview.json").write_text(
+            json.dumps(result, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        self.controller.update_worklist_state(self.tmp, state, "requirement_interview", "PASS")
+
     def test_init_creates_run_state_worklist_and_events(self):
         out = io.StringIO()
         code = self.controller.main([
@@ -54,11 +114,16 @@ class LoopxControllerTest(unittest.TestCase):
         self.assertEqual(state["run_id"], "2026-05-15-controller")
         self.assertEqual(state["mode"], "LIGHT")
         self.assertEqual(state["risk_tags"], [])
-        self.assertEqual(state["current_stage"], "environment_check")
-        self.assertEqual(state["active_agent"], "environment-check-agent")
+        self.assertEqual(state["current_stage"], "requirement_intake")
+        self.assertEqual(state["active_agent"], "project-manager")
+        self.assertEqual(state["stages"]["environment_check"], "PASS")
         self.assertEqual(state["stage_owners"]["solution_design"], "solution-designer")
         self.assertEqual(state["repair_tickets"], ".loopx/runs/2026-05-15-controller/repair-tickets")
         self.assertEqual(state["worklist"], ".loopx/runs/2026-05-15-controller/worklist.yml")
+        stage_result = json.loads((run_dir / "stage-results" / "00-environment-check.json").read_text(encoding="utf-8"))
+        self.assertEqual(stage_result["stage"], "environment_check")
+        self.assertEqual(stage_result["status"], "PASS")
+        self.assertFalse(stage_result["user_confirmation_required"])
         self.assertTrue((run_dir / "worklist.yml").exists())
         self.assertTrue((run_dir / "repair-tickets").exists())
         self.assertTrue((run_dir / "events.jsonl").exists())
@@ -97,8 +162,8 @@ class LoopxControllerTest(unittest.TestCase):
         self.assertIn("spec:", worklist)
         self.assertIn("interview:", worklist)
         self.assertIn("stages:", worklist)
-        self.assertIn("name: 需求采访", worklist)
-        self.assertIn("name: 执行等级选择", worklist)
+        self.assertIn('name: "需求采访"', worklist)
+        self.assertIn('name: "执行等级选择"', worklist)
 
     def test_init_auto_mode_uses_risk_tags_to_select_full(self):
         out = io.StringIO()
@@ -200,7 +265,7 @@ items:
         self.assertEqual(code, 0)
         text = out.getvalue()
         self.assertIn("run_id: status-run", text)
-        self.assertIn("current_stage: environment_check", text)
+        self.assertIn("current_stage: requirement_intake", text)
 
     def test_status_tracking_outputs_full_stage_list(self):
         self.controller.main([
@@ -226,7 +291,8 @@ items:
         self.assertIn("LoopX 追踪", text)
         self.assertIn("运行: tracking-run", text)
         self.assertIn("需求规格: NOT_CREATED", text)
-        self.assertIn("[>] 00 环境检查", text)
+        self.assertIn("[x] 00 环境检查", text)
+        self.assertIn("[>] 01 需求接收", text)
         self.assertIn("[ ] 02 需求采访", text)
         self.assertIn("[ ] 05 执行等级选择", text)
 
@@ -433,19 +499,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        self.controller.main([
-            "record-stage",
-            "--run-id",
-            "strict-interview-run",
-            "--stage",
-            "requirement_interview",
-            "--status",
-            "PASS",
-            "--evidence",
-            ".loopx/runs/strict-interview-run/artifacts/interview.md",
-            "--project",
-            str(self.tmp),
-        ], stdout=io.StringIO())
+        self.force_interview_pass_state("strict-interview-run", unanswered_questions=3)
 
         out = io.StringIO()
         code = self.controller.main([
@@ -476,26 +530,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-interview-placeholder-run"
-        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
-        state["interview"]["unanswered_questions"] = 0
-        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
-        self.controller.main([
-            "record-stage",
-            "--run-id",
-            "strict-interview-placeholder-run",
-            "--stage",
-            "requirement_interview",
-            "--status",
-            "PASS",
-            "--evidence",
-            ".loopx/runs/strict-interview-placeholder-run/artifacts/interview.md",
-            "--project",
-            str(self.tmp),
-        ], stdout=io.StringIO())
-        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
-        state["interview"]["unanswered_questions"] = 0
-        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        self.force_interview_pass_state("strict-interview-placeholder-run", unanswered_questions=0)
 
         out = io.StringIO()
         code = self.controller.main([
@@ -979,9 +1014,16 @@ LIGHT.
         worklist = (run_dir / "worklist.yml").read_text(encoding="utf-8")
 
         self.assertTrue(artifact.exists())
-        self.assertIn("需求采访", artifact.read_text(encoding="utf-8"))
+        artifact_text = artifact.read_text(encoding="utf-8")
+        self.assertIn("需求采访", artifact_text)
+        self.assertIn("这个需求要解决的具体问题是什么", artifact_text)
+        self.assertIn("状态：未回答", artifact_text)
         self.assertEqual(state["current_stage"], "requirement_interview")
         self.assertEqual(state["interview"]["status"], "IN_PROGRESS")
+        self.assertGreater(state["interview"]["unanswered_questions"], 0)
+        self.assertIn("这个需求要解决的具体问题是什么", "\n".join(state["interview"]["blocking_questions"]))
+        self.assertIn("请回答以下需求采访问题", out.getvalue())
+        self.assertIn("Q1:", out.getvalue())
         self.assertIn("generated interview", out.getvalue())
         self.assertIn("current_stage: requirement_interview", out.getvalue())
         self.assertIn("current_stage: requirement_interview", worklist)
@@ -1013,7 +1055,9 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        self.controller.main([
+
+        out = io.StringIO()
+        code = self.controller.main([
             "record-stage",
             "--run-id",
             "spec-command-run",
@@ -1025,7 +1069,63 @@ LIGHT.
             ".loopx/runs/spec-command-run/artifacts/interview.md",
             "--project",
             str(self.tmp),
-        ], stdout=io.StringIO())
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("requirement_interview cannot PASS before interview questions are answered", out.getvalue())
+
+        self.answer_interview_artifact("spec-command-run")
+        out = io.StringIO()
+        code = self.controller.main([
+            "record-stage",
+            "--run-id",
+            "spec-command-run",
+            "--stage",
+            "requirement_interview",
+            "--status",
+            "PASS",
+            "--evidence",
+            ".loopx/runs/spec-command-run/artifacts/interview.md",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        self.assertIn("NEED_HUMAN requirement_interview", out.getvalue())
+        run_dir = self.tmp / ".loopx" / "runs" / "spec-command-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        result = json.loads((run_dir / "stage-results" / "02-requirement-interview.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["stages"]["requirement_interview"], "NEED_HUMAN")
+        self.assertEqual(state["interview"]["status"], "NEED_HUMAN")
+        self.assertEqual(result["status"], "NEED_HUMAN")
+        self.assertTrue(result["user_confirmation_required"])
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "spec",
+            "spec-command-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("requirement_interview is waiting for user confirmation", out.getvalue())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "confirm-stage",
+            "--run-id",
+            "spec-command-run",
+            "--stage",
+            "requirement_interview",
+            "--evidence",
+            "user confirmed interview",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0)
+        self.assertIn("PASS confirmed requirement_interview", out.getvalue())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -1036,7 +1136,6 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        run_dir = self.tmp / ".loopx" / "runs" / "spec-command-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         artifact = run_dir / "artifacts" / "spec.md"
 

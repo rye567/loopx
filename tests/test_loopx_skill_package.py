@@ -39,6 +39,7 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertIn("fail-review", text)
         self.assertIn("claim-stage", text)
         self.assertIn("close-repair", text)
+        self.assertIn("confirm-stage --stage requirement_interview", text)
         self.assertIn("can-write --kind business", text)
         self.assertIn("`validate PASS` 只代表结构合法", text)
         self.assertIn("返工任务", text)
@@ -135,6 +136,24 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertNotIn("loopx init", workflow)
         self.assertNotIn("loopx status", workflow)
         self.assertNotIn("loopx validate", workflow)
+
+    def test_controller_entrypoint_is_thin_facade(self):
+        entrypoint = LOOPX / "tools" / "loopx_controller.py"
+        core = LOOPX / "tools" / "loopx_controller_core.py"
+        contracts = LOOPX / "tools" / "loopx_controller_contracts.py"
+        io_helpers = LOOPX / "tools" / "loopx_controller_io.py"
+        yaml_helpers = LOOPX / "tools" / "loopx_controller_yaml.py"
+        artifact_helpers = LOOPX / "tools" / "loopx_controller_artifacts.py"
+        text = entrypoint.read_text(encoding="utf-8")
+
+        self.assertTrue(core.exists(), "controller implementation should live outside the CLI facade")
+        self.assertTrue(contracts.exists(), "process contracts should be split from command orchestration")
+        self.assertTrue(io_helpers.exists(), "file and schema helpers should be split from command orchestration")
+        self.assertTrue(yaml_helpers.exists(), "YAML/worklist helpers should be split from the controller core")
+        self.assertTrue(artifact_helpers.exists(), "artifact rendering helpers should be split from the controller core")
+        self.assertLessEqual(len(text.splitlines()), 80)
+        self.assertLessEqual(len(core.read_text(encoding="utf-8").splitlines()), 1600)
+        self.assertIn("loopx_controller_core", text)
 
 
 if __name__ == "__main__":

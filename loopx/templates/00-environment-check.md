@@ -1,5 +1,7 @@
 # 00 环境检查
 
+本阶段由 controller 在 `init` 时自动执行并记录为 `PASS`，不需要人工确认。
+
 - 状态：
 - 本地运行时：
 - 构建工具：
@@ -15,14 +17,14 @@
 
 ```yaml
 stage_result:
-  stage: "00 环境检查"
-  status:
-  return_to:
-  next_action:
+  stage: environment_check
+  status: PASS
+  return_to: ""
+  next_action: requirement_intake
   affected_work_items: []
   evidence: []
-  user_confirmation_required:
-  blocked_reason:
+  user_confirmation_required: false
+  blocked_reason: ""
 ```
 
 ## Evidence
