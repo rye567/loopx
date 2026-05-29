@@ -1,6 +1,6 @@
 # 08 代码审查
 
-- 状态：NEED_HUMAN（agent 审查通过后等待用户确认）
+- 状态：PASS（agent 审查通过后可进入测试执行）
 - Findings：
 - 开放问题：
 - 变更摘要：
@@ -13,12 +13,12 @@
 ```yaml
 stage_result:
   stage: "08 代码审查"
-  status: NEED_HUMAN
+  status: PASS
   return_to:
-  next_action: confirm-stage --stage code_review
+  next_action: test_execution
   affected_work_items: []
   evidence: []
-  user_confirmation_required: true
+  user_confirmation_required: false
   blocked_reason:
 ```
 

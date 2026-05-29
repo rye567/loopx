@@ -96,6 +96,5 @@ CONFIRMATION_GATE_STAGES = {
     "requirement_interview": "spec_draft",
     "solution_review": "test_design",
     "test_review": "development",
-    "code_review": "test_execution",
     "release_readiness": "final_report",
 }

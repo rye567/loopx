@@ -33,7 +33,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 ```
 
 6. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行还需要阶段 `PASS`、写入闸门、health gate 和未覆盖项说明。
-7. 确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage <stage> --evidence "..."` 才能继续。
+7. 确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage <stage> --evidence "..."` 才能继续。代码审查 `PASS` 后不需要人工确认，可继续进入测试执行。
 
 ## 入口
 
@@ -56,7 +56,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 1. 做项目发现：README、构建文件、主配置、源码结构和测试目录；`init` 后环境检查应已自动 `PASS`，当前阶段进入 `requirement_intake`。
 2. 按 `risk.yml` 准备风险标签，用 `init --mode auto --risk-tags ...` 选择执行深度。
 3. 按 `workflow.md` 阶段顺序推进；每阶段读取对应 `agents/`、必要时使用 `templates/`；需求采访阶段必须先向用户提问并等待回答。
-4. 阶段结束写入 `stage-results/*.json`；`requirement_interview` 和各审核确认门停在 `NEED_HUMAN`，用户确认后用 `confirm-stage` 转为 `PASS`。
+4. 阶段结束写入 `stage-results/*.json`；`requirement_interview`、`solution_review`、`test_review` 和 `release_readiness` 确认门停在 `NEED_HUMAN`，用户确认后用 `confirm-stage` 转为 `PASS`。`code_review` 记录 `PASS` 后可继续进入测试执行。
 5. 进入下一阶段前用 `advance --to ...` 或 `next`；最终用 `gate`、`git-gate`、`close` 收口。
 6. 最终结论区分本地通过、本地阻塞、未覆盖/需 CI 验证。
 

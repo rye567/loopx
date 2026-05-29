@@ -40,10 +40,9 @@
 - 需求采访必须先向用户输出问题，收集回答并更新 `interview.md`；未回答时不得记录 `PASS`。
 - 方案审核通过后，确认是否进入测试用例设计。
 - 测试用例审核通过后，确认是否进入开发阶段。
-- 代码审查通过后，确认是否进入测试执行。
 - 测试执行通过后，先执行 `/health`，再确认是否结束并采纳测试报告。
 
-控制器层面使用中间状态强制表达该门禁：agent 在 `requirement_interview`、`solution_review`、`test_review`、`code_review` 或 `release_readiness` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。需求采访确认是生成 Spec 的前置门：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。最终采纳确认落在 `release_readiness`：`test_execution PASS -> health_gate PASS -> release_readiness NEED_HUMAN -> confirm-stage -> release_readiness PASS -> final_report`。
+控制器层面使用中间状态强制表达该门禁：agent 在 `requirement_interview`、`solution_review`、`test_review` 或 `release_readiness` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。代码审查 `PASS` 后不需要人工确认，可继续进入测试执行。需求采访确认是生成 Spec 的前置门：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。最终采纳确认落在 `release_readiness`：`test_execution PASS -> health_gate PASS -> release_readiness NEED_HUMAN -> confirm-stage -> release_readiness PASS -> final_report`。
 
 如果用户明确说“本次全自动”“跳过人工确认”或“恢复自动推进”，才可以取消本次确认门。高风险动作仍必须单独确认。
 
@@ -113,7 +112,7 @@ stage_result:
 | 9 测试用例审核 | NEED_HUMAN，`confirm-stage` 后到 10 | 8 测试用例设计 | 等用户处理 |
 | 10 开发 | 11 通用质量审计 | 10 开发 | 等用户处理 |
 | 11 通用质量审计 | 12 代码审查 | 6/8/10，按失败原因选择 | 等用户处理 |
-| 12 代码审查 | NEED_HUMAN，`confirm-stage` 后到 13 | 10 开发 | 等用户处理 |
+| 12 代码审查 | 13 测试执行 | 10 开发 | 等用户处理 |
 | 13 测试执行 | 14 健康门 | 8/10，按失败原因选择 | 等用户处理 |
 | 14 健康门 | 15 发布就绪 | 对应责任阶段 | 等用户处理 |
 | 15 发布就绪 | NEED_HUMAN，`confirm-stage` 后到 16 | 对应责任阶段 | 等用户处理 |
