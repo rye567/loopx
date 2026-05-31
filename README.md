@@ -1,62 +1,160 @@
 # LoopX Kit
 
-LoopX Kit 是用 Git 维护的跨工具工程质量门 skill 包。`loopx/` 是唯一主源，可安装到 Codex 或 Claude Code 的 skills 目录；完整流程契约见 `loopx/workflow.md`。
+Quality gates for AI coding agents.
 
-## 安装
+[中文说明](README.zh-CN.md)
+
+LoopX is a Git-maintained skill package for Codex and Claude Code. It keeps AI coding work from jumping straight into implementation by forcing risky changes through requirement interview, spec drafting, human-confirmed reviews, test planning, implementation, and release gates.
+
+Use it when an agent is about to touch cross-module behavior, API contracts, permissions, tenant boundaries, state machines, SQL/MQ flows, or anything where "looks done" is not good enough.
+
+## Why LoopX
+
+AI coding agents are fast, but they often skip requirements, invent acceptance criteria, mark reviews as passed without evidence, or edit business logic before the plan has been checked. LoopX adds a local controller and a staged workflow so every meaningful change leaves auditable artifacts before code changes ship.
+
+| Without LoopX | With LoopX |
+| --- | --- |
+| Agent starts coding from a vague prompt | Agent starts with requirement intake and interview |
+| Acceptance criteria are implied | Spec artifacts are generated and reviewed |
+| Reviews can be hand-waved | Review gates require recorded evidence |
+| High-risk edits happen too early | Business writes are blocked until review gates pass |
+| "Done" is a chat message | Final gate records local checks, gaps, and release readiness |
+
+## Workflow
+
+```text
+request
+  -> environment check
+  -> requirement intake
+  -> requirement interview
+  -> spec draft
+  -> spec review
+  -> mode selection
+  -> solution design
+  -> solution review
+  -> test design
+  -> test review
+  -> implementation
+  -> code review
+  -> validation
+  -> release readiness
+```
+
+The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `.loopx/runs/<run_id>/`, including state, events, stage results, worklists, repair tickets, and generated artifacts.
+
+## Install
+
+Clone the repository:
 
 ```bash
 git clone git@github.com:rye567/loopx-kit.git
 cd loopx-kit
 ```
 
-把 `loopx/` 目录复制或符号链接到目标工具的 skills 目录，并保留目录名为 `loopx`。本仓库不再生成工具专属适配层。
+Link or copy the [`loopx/`](loopx/) directory into your tool's skills directory and keep the directory name as `loopx`.
 
-## 使用
+Recommended live-link setup:
 
-```text
-Codex: $loopx 处理需求：...
-Claude Code: /loopx 处理需求：...
+```powershell
+# Codex
+New-Item -ItemType Junction `
+  -Path "$HOME\.codex\skills\loopx" `
+  -Target "E:\workspace\loopx-kit\loopx"
+
+# Claude Code
+New-Item -ItemType Junction `
+  -Path "$HOME\.claude\skills\loopx" `
+  -Target "E:\workspace\loopx-kit\loopx"
 ```
 
-项目内如需提示入口，可以加入：
-
-```text
-当用户要求 LoopX、质量门或完整阶段化交付时，使用已安装的 loopx skill；先读取当前项目 README、构建文件、主要配置和测试目录，再按 LoopX 阶段执行。
-```
-
-## 状态控制器
-
-控制器把运行过程持久化到 `.loopx/runs/<run_id>/`，包括 `state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `repair-tickets/`。完整命令流见 `loopx/workflow.md`；常用入口如下：
+On Unix-like systems, use a symbolic link:
 
 ```bash
-python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags api_contract
+ln -s "$PWD/loopx" "$HOME/.codex/skills/loopx"
+ln -s "$PWD/loopx" "$HOME/.claude/skills/loopx"
+```
+
+## Use
+
+```text
+Codex: $loopx handle this requirement: ...
+Claude Code: /loopx handle this requirement: ...
+```
+
+For project-local reminders, add a short note to your project docs:
+
+```text
+When the user asks for LoopX, quality gates, or full staged delivery, use the installed loopx skill. Read the current project README, build files, primary configuration, source layout, and tests before running the LoopX stages.
+```
+
+## Controller Quickstart
+
+Start a run:
+
+```bash
+python loopx/tools/loopx_controller.py init "Add tenant-scoped API access" --mode auto --risk-tags tenant_scope api_contract
+```
+
+Inspect progress:
+
+```bash
 python loopx/tools/loopx_controller.py status --tracking
+```
+
+Run validation and gates:
+
+```bash
 python loopx/tools/loopx_controller.py validate --strict
 python loopx/tools/loopx_controller.py gate <run_id>
+python loopx/tools/loopx_controller.py git-gate <run_id>
+python loopx/tools/loopx_controller.py close <run_id>
 ```
 
-`init` 会自动执行环境检查，写入 `stage-results/00-environment-check.json`，并把当前阶段推进到 `requirement_intake`，不需要人工确认。
-
-`interview` 会把需求采访问题输出给用户；必须把用户回答写入 `interview.md`，且文件不再包含“待用户回答/未回答”等占位后，才能记录 `requirement_interview PASS`。
-
-确认门阶段的 agent `PASS` 会先落为 `NEED_HUMAN`，必须用 `confirm-stage` 写入用户确认后才变为 `PASS`。业务写入要求 `solution_review` 和 `test_review` 都已确认通过：
+Before writing business logic, LoopX expects the relevant human-confirmed review gates to pass:
 
 ```bash
-python loopx/tools/loopx_controller.py confirm-stage --stage requirement_interview --evidence "user confirmed interview"
-python loopx/tools/loopx_controller.py confirm-stage --stage solution_review --evidence "user confirmed solution review"
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-## 更新
+## What Is Included
+
+- `loopx/SKILL.md`: the Codex and Claude Code skill entry point
+- `loopx/workflow.md`: the staged workflow contract
+- `loopx/agents/`: role instructions for each quality stage
+- `loopx/templates/`: artifact templates for interviews, specs, reviews, and release reports
+- `loopx/schemas/`: JSON schemas for state, stage results, tracking, mode selection, and specs
+- `loopx/tools/loopx_controller.py`: the local state controller
+- `loopx/tools/loopx_check.py`: health and package checks
+- `tests/`: regression tests for the controller and skill package
+
+## Project Fit
+
+LoopX is useful when:
+
+- The change crosses module or ownership boundaries.
+- A vague request needs to become an explicit spec.
+- Review evidence matters more than agent confidence.
+- The project has security, tenant, permission, data, or state-transition risk.
+- Multiple agents or tools need one shared workflow contract.
+
+LoopX is probably too heavy for:
+
+- One-line copy changes.
+- Throwaway prototypes.
+- Purely exploratory spikes with no release intent.
+
+## Recommended GitHub Topics
+
+`codex`, `claude-code`, `ai-agents`, `agent-workflow`, `quality-gate`, `developer-tools`, `automation`, `python`, `prompt-engineering`
+
+## Update
 
 ```bash
 git pull
 ```
 
-## 跨平台约束
+If you installed LoopX with a link or junction, updates to this repository are available to Codex and Claude Code immediately.
 
-LoopX 不依赖 `/data`、`/usr/bin/python3`、`~/.local/bin` 等单一平台路径。skill 内脚本使用相对资源路径，避免把某台机器的绝对路径带到其它机器。
+## License
 
-## 仓库策略
-
-建议保护 `main` 分支，只允许通过 PR 合并，并要求所有者审批。本项目暂未声明开源许可证；公开可见不等于自动授权复用、改造或商用。
+MIT. See [`LICENSE`](LICENSE).
