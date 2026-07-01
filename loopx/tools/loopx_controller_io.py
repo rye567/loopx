@@ -22,7 +22,7 @@ def load_schema(name):
 
 
 def run_root(project):
-    return project / ".loopx" / "runs"
+    return project / "docs" / "loopx" / "runs"
 
 
 def get_run_dir(project, run_id):

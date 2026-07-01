@@ -142,7 +142,7 @@ class LoopxSkillPackageTest(unittest.TestCase):
         workflow = (LOOPX / "workflow.md").read_text(encoding="utf-8")
 
         self.assertIn("docs/loopx/<date>-<slug>/", workflow)
-        self.assertIn(".loopx/runs/<run_id>/", workflow)
+        self.assertIn("docs/loopx/runs/<run_id>/", workflow)
 
     def test_controller_entrypoint_is_thin_facade(self):
         entrypoint = LOOPX / "tools" / "loopx_controller.py"

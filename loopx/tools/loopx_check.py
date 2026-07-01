@@ -184,7 +184,7 @@ def load_json(path: Path) -> tuple[dict | None, str | None]:
 
 
 def find_latest_run(root: Path) -> Path | None:
-    runs = root / ".loopx" / "runs"
+    runs = root / "docs" / "loopx" / "runs"
     if not runs.exists():
         return None
     candidates = [path for path in runs.iterdir() if path.is_dir()]
@@ -199,7 +199,7 @@ def check_project_run(root: Path) -> CheckResult:
         return CheckResult(
             name="loopx_run_state",
             status=PASS_WITH_WARNINGS,
-            message="未发现 .loopx run；项目尚未创建本地 LoopX run。",
+            message="未发现 docs/loopx/runs/<run_id>；项目尚未创建本地 LoopX run。",
             evidence=[],
         )
     state, error = load_json(latest / "state.json")

@@ -28,7 +28,7 @@ class LoopxControllerTest(unittest.TestCase):
         shutil.rmtree(self.tmp)
 
     def run_dir(self, run_id):
-        return self.tmp / ".loopx" / "runs" / run_id
+        return self.tmp / "docs" / "loopx" / "runs" / run_id
 
     def read_state(self, run_id):
         return json.loads((self.run_dir(run_id) / "state.json").read_text(encoding="utf-8"))
@@ -86,7 +86,7 @@ class LoopxControllerTest(unittest.TestCase):
             "PASS",
             "",
             "spec_draft",
-            [f".loopx/runs/{run_id}/artifacts/interview.md"],
+            [f"docs/loopx/runs/{run_id}/artifacts/interview.md"],
             [],
             "",
         )
@@ -108,7 +108,7 @@ class LoopxControllerTest(unittest.TestCase):
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        run_dir = self.tmp / ".loopx" / "runs" / "2026-05-15-controller"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "2026-05-15-controller"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
 
         self.assertEqual(state["run_id"], "2026-05-15-controller")
@@ -118,14 +118,14 @@ class LoopxControllerTest(unittest.TestCase):
         self.assertEqual(state["active_agent"], "project-manager")
         self.assertEqual(state["stages"]["environment_check"], "PASS")
         self.assertEqual(state["stage_owners"]["solution_design"], "solution-designer")
-        self.assertEqual(state["repair_tickets"], ".loopx/runs/2026-05-15-controller/repair-tickets")
-        self.assertEqual(state["worklist"], ".loopx/runs/2026-05-15-controller/worklist.yml")
+        self.assertEqual(state["repair_tickets"], "docs/loopx/runs/2026-05-15-controller/artifacts/repair-tickets")
+        self.assertEqual(state["worklist"], "docs/loopx/runs/2026-05-15-controller/worklist.yml")
         stage_result = json.loads((run_dir / "stage-results" / "00-environment-check.json").read_text(encoding="utf-8"))
         self.assertEqual(stage_result["stage"], "environment_check")
         self.assertEqual(stage_result["status"], "PASS")
         self.assertFalse(stage_result["user_confirmation_required"])
         self.assertTrue((run_dir / "worklist.yml").exists())
-        self.assertTrue((run_dir / "repair-tickets").exists())
+        self.assertTrue((run_dir / "artifacts" / "repair-tickets").exists())
         self.assertTrue((run_dir / "events.jsonl").exists())
         self.assertIn("created run 2026-05-15-controller", out.getvalue())
 
@@ -145,15 +145,15 @@ class LoopxControllerTest(unittest.TestCase):
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        run_dir = self.tmp / ".loopx" / "runs" / "front-gates-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "front-gates-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         worklist = (run_dir / "worklist.yml").read_text(encoding="utf-8")
 
         self.assertTrue((run_dir / "artifacts").exists())
         self.assertEqual(state["interview"]["status"], "NOT_STARTED")
-        self.assertEqual(state["interview"]["artifact"], ".loopx/runs/front-gates-run/artifacts/interview.md")
+        self.assertEqual(state["interview"]["artifact"], "docs/loopx/runs/front-gates-run/artifacts/interview.md")
         self.assertEqual(state["spec"]["status"], "NOT_CREATED")
-        self.assertEqual(state["spec"]["artifact"], ".loopx/runs/front-gates-run/artifacts/spec.md")
+        self.assertEqual(state["spec"]["artifact"], "docs/loopx/runs/front-gates-run/artifacts/spec.md")
         self.assertEqual(state["mode_decision"]["recommended"], "STANDARD")
         self.assertEqual(state["mode_decision"]["selected"], "")
         self.assertEqual(state["mode_decision"]["selection_status"], "NEED_HUMAN")
@@ -183,7 +183,7 @@ class LoopxControllerTest(unittest.TestCase):
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        state = json.loads((self.tmp / ".loopx" / "runs" / "risk-run" / "state.json").read_text(encoding="utf-8"))
+        state = json.loads((self.tmp / "docs" / "loopx" / "runs" / "risk-run" / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["mode"], "FULL")
         self.assertEqual(state["mode_decision"]["recommended"], "FULL")
         self.assertEqual(state["mode_decision"]["selected"], "")
@@ -205,14 +205,14 @@ class LoopxControllerTest(unittest.TestCase):
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        state = json.loads((self.tmp / ".loopx" / "runs" / "explicit-mode-run" / "state.json").read_text(encoding="utf-8"))
+        state = json.loads((self.tmp / "docs" / "loopx" / "runs" / "explicit-mode-run" / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["mode_decision"]["recommended"], "STANDARD")
         self.assertEqual(state["mode_decision"]["selected"], "STANDARD")
         self.assertEqual(state["mode_decision"]["selection_status"], "CONFIRMED")
         self.assertEqual(state["mode_decision"]["selected_by"], "user")
 
     def test_validate_rejects_worklist_items_missing_required_fields(self):
-        run_dir = self.tmp / ".loopx" / "runs" / "bad-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "bad-run"
         run_dir.mkdir(parents=True)
         (run_dir / "state.json").write_text(json.dumps({
             "run_id": "bad-run",
@@ -222,8 +222,8 @@ class LoopxControllerTest(unittest.TestCase):
             "current_stage": "environment_check",
             "confirmation_policy": "verification_gated",
             "max_auto_repair": 2,
-            "worklist": ".loopx/runs/bad-run/worklist.yml",
-            "events": ".loopx/runs/bad-run/events.jsonl",
+            "worklist": "docs/loopx/runs/bad-run/worklist.yml",
+            "events": "docs/loopx/runs/bad-run/events.jsonl",
             "stages": {},
         }), encoding="utf-8")
         (run_dir / "worklist.yml").write_text("""run:
@@ -305,7 +305,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        result_path = self.tmp / ".loopx" / "runs" / "stage-result-run" / "stage-results" / "01-requirement-intake.json"
+        result_path = self.tmp / "docs" / "loopx" / "runs" / "stage-result-run" / "stage-results" / "01-requirement-intake.json"
         result_path.write_text(json.dumps({
             "stage": "requirement_intake",
             "status": "PASS",
@@ -336,7 +336,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         del state["interview"]
         (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
@@ -364,7 +364,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-schema-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-schema-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         del state["interview"]["artifact"]
         state["tracking"]["show_on_every_update"] = "yes"
@@ -407,7 +407,7 @@ items:
         self.assertIn("PASS gate gate-run", out.getvalue())
         self.assertIn("strict validation", out.getvalue())
 
-        run_dir = self.tmp / ".loopx" / "runs" / "gate-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "gate-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         del state["tracking"]
         (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
@@ -433,7 +433,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-git-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-git-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         del state["git_gate"]
         (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
@@ -461,7 +461,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-full-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-full-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["stages"]["solution_review"] = "SKIPPED"
         state["stages"]["test_review"] = "SKIPPED"
@@ -555,7 +555,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-spec-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-spec-run"
         artifact = run_dir / "artifacts" / "spec.md"
         artifact.write_text("# Requirement Spec\n\n## Summary\n\nOnly a summary.\n", encoding="utf-8")
         self.controller.main([
@@ -567,7 +567,7 @@ items:
             "--status",
             "PASS",
             "--evidence",
-            ".loopx/runs/strict-spec-run/artifacts/spec.md",
+            "docs/loopx/runs/strict-spec-run/artifacts/spec.md",
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
@@ -596,7 +596,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-empty-spec-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-empty-spec-run"
         artifact = run_dir / "artifacts" / "spec.md"
         artifact.write_text("""# Requirement Spec
 
@@ -637,7 +637,7 @@ LIGHT.
             "--status",
             "PASS",
             "--evidence",
-            ".loopx/runs/strict-empty-spec-run/artifacts/spec.md",
+            "docs/loopx/runs/strict-empty-spec-run/artifacts/spec.md",
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
@@ -693,7 +693,7 @@ LIGHT.
         self.assertIn("state.git_gate.status must be PASS before final_report PASS", out.getvalue())
         self.assertIn("state.git_gate.diff_summary is required for final_report PASS", out.getvalue())
 
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-final-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-final-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["git_gate"]["status"] = "PASS"
         state["git_gate"]["diff_summary"] = "M loopx/tools/loopx_controller.py"
@@ -748,7 +748,7 @@ LIGHT.
 
         self.assertEqual(code, 0)
         self.assertIn("PASS git gate git-gate-run", out.getvalue())
-        state = json.loads((self.tmp / ".loopx" / "runs" / "git-gate-run" / "state.json").read_text(encoding="utf-8"))
+        state = json.loads((self.tmp / "docs" / "loopx" / "runs" / "git-gate-run" / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["git_gate"]["status"], "PASS")
         self.assertIn("tracked-change.txt", state["git_gate"]["diff_summary"])
 
@@ -774,7 +774,7 @@ LIGHT.
 
         self.assertEqual(code, 1)
         self.assertIn("NEED_HUMAN git gate git-gate-no-repo-run", out.getvalue())
-        state = json.loads((self.tmp / ".loopx" / "runs" / "git-gate-no-repo-run" / "state.json").read_text(encoding="utf-8"))
+        state = json.loads((self.tmp / "docs" / "loopx" / "runs" / "git-gate-no-repo-run" / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["git_gate"]["status"], "NEED_HUMAN")
 
     def test_strict_validate_rejects_worklist_stage_status_drift(self):
@@ -788,7 +788,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-tracking-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-tracking-run"
         self.controller.main([
             "record-stage",
             "--run-id",
@@ -830,7 +830,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "strict-full-final-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-full-final-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["stages"]["final_report"] = "PASS"
         state["git_gate"]["status"] = "PASS"
@@ -895,7 +895,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "close-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "close-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["git_gate"]["status"] = "PASS"
         state["git_gate"]["diff_summary"] = "M README.md"
@@ -944,7 +944,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "front-gate-advance-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "front-gate-advance-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["stages"] = {
             "environment_check": "PASS",
@@ -988,7 +988,7 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        run_dir = self.tmp / ".loopx" / "runs" / "interview-command-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "interview-command-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         artifact = run_dir / "artifacts" / "interview.md"
         worklist = (run_dir / "worklist.yml").read_text(encoding="utf-8")
@@ -1046,7 +1046,7 @@ LIGHT.
             "--status",
             "PASS",
             "--evidence",
-            ".loopx/runs/spec-command-run/artifacts/interview.md",
+            "docs/loopx/runs/spec-command-run/artifacts/interview.md",
             "--project",
             str(self.tmp),
         ], stdout=out)
@@ -1065,14 +1065,14 @@ LIGHT.
             "--status",
             "PASS",
             "--evidence",
-            ".loopx/runs/spec-command-run/artifacts/interview.md",
+            "docs/loopx/runs/spec-command-run/artifacts/interview.md",
             "--project",
             str(self.tmp),
         ], stdout=out)
 
         self.assertEqual(code, 0)
         self.assertIn("NEED_HUMAN requirement_interview", out.getvalue())
-        run_dir = self.tmp / ".loopx" / "runs" / "spec-command-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "spec-command-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         result = json.loads((run_dir / "stage-results" / "02-requirement-interview.json").read_text(encoding="utf-8"))
         self.assertEqual(state["stages"]["requirement_interview"], "NEED_HUMAN")
@@ -1138,7 +1138,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "mode-command-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "mode-command-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["stages"] = {
             "environment_check": "PASS",
@@ -1195,7 +1195,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "next-command-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "next-command-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["current_stage"] = "mode_selection"
         state["stages"] = {
@@ -1247,7 +1247,7 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        run_dir = self.tmp / ".loopx" / "runs" / "record-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "record-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         result = json.loads((run_dir / "stage-results" / "06-solution-design.json").read_text(encoding="utf-8"))
         self.assertEqual(state["stages"]["solution_design"], "PASS")
@@ -1257,7 +1257,7 @@ LIGHT.
         worklist = (run_dir / "worklist.yml").read_text(encoding="utf-8")
         self.assertIn("stage: solution_design", worklist)
         self.assertIn("status: PASS", worklist)
-        self.assertIn('evidence: ".loopx/runs/record-run/stage-results/06-solution-design.json"', worklist)
+        self.assertIn('evidence: "docs/loopx/runs/record-run/stage-results/06-solution-design.json"', worklist)
         self.assertIn("PASS solution_design", out.getvalue())
 
     def test_advance_blocks_when_prior_stage_is_not_pass(self):
@@ -1310,7 +1310,7 @@ LIGHT.
         self.assertIn("FAIL business writes locked", out.getvalue())
         self.assertIn("current_stage must be development", out.getvalue())
 
-        run_dir = self.tmp / ".loopx" / "runs" / "write-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "write-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["current_stage"] = "development"
         state["stages"]["solution_review"] = "PASS"
@@ -1703,7 +1703,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "feedback-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "feedback-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["current_stage"] = "development"
         state["stages"] = {
@@ -1792,9 +1792,9 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        run_dir = self.tmp / ".loopx" / "runs" / "repair-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "repair-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
-        ticket = json.loads((run_dir / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
+        ticket = json.loads((run_dir / "artifacts" / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
 
         self.assertEqual(state["current_stage"], "solution_design")
         self.assertEqual(state["active_agent"], "solution-designer")
@@ -1898,7 +1898,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        ticket = json.loads((self.tmp / ".loopx" / "runs" / "close-run" / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
+        ticket = json.loads((self.tmp / "docs" / "loopx" / "runs" / "close-run" / "artifacts" / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
         self.assertEqual(ticket["status"], "CLOSED")
         self.assertEqual(ticket["artifact"], "stage-results/06-solution-design.json")
         self.assertEqual(ticket["revision"], 2)
@@ -1914,7 +1914,7 @@ items:
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        run_dir = self.tmp / ".loopx" / "runs" / "repair-advance-run"
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "repair-advance-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         state["stages"] = {
             "environment_check": "PASS",

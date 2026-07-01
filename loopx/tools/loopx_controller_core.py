@@ -76,13 +76,13 @@ def render_worklist(run_id, requirement, mode):
 
 spec:
   status: NOT_CREATED
-  path: {yaml_string(f".loopx/runs/{run_id}/artifacts/spec.md")}
+  path: {yaml_string(f"docs/loopx/runs/{run_id}/artifacts/spec.md")}
   approved: false
 
 interview:
   status: NOT_STARTED
   unanswered_questions: 0
-  path: {yaml_string(f".loopx/runs/{run_id}/artifacts/interview.md")}
+  path: {yaml_string(f"docs/loopx/runs/{run_id}/artifacts/interview.md")}
 
 stages:
 {chr(10).join(stage_lines)}
@@ -189,7 +189,7 @@ def interview_state(run_id, mode):
         "required": True,
         "mode": mode,
         "status": "NOT_STARTED",
-        "artifact": f".loopx/runs/{run_id}/artifacts/interview.md",
+        "artifact": f"docs/loopx/runs/{run_id}/artifacts/interview.md",
         "unanswered_questions": 0,
         "can_skip": False,
     }
@@ -199,7 +199,7 @@ def spec_state(run_id):
     return {
         "required": True,
         "status": "NOT_CREATED",
-        "artifact": f".loopx/runs/{run_id}/artifacts/spec.md",
+        "artifact": f"docs/loopx/runs/{run_id}/artifacts/spec.md",
         "approved": False,
         "gate_result": "PENDING",
     }
@@ -233,7 +233,7 @@ def transition_policy_state():
 def tracking_state(run_id):
     return {
         "show_on_every_update": True,
-        "worklist": f".loopx/runs/{run_id}/worklist.yml",
+        "worklist": f"docs/loopx/runs/{run_id}/worklist.yml",
     }
 
 
@@ -266,7 +266,7 @@ def update_worklist_state(project, state, stage=None, stage_status=None):
                 if stage in {"spec_draft", "spec_review"}:
                     artifact = state.get("spec", {}).get("artifact", "")
                 if not artifact and stage in STAGE_RESULT_FILES:
-                    artifact = f".loopx/runs/{state.get('run_id')}/stage-results/{STAGE_RESULT_FILES[stage]}"
+                    artifact = f"docs/loopx/runs/{state.get('run_id')}/stage-results/{STAGE_RESULT_FILES[stage]}"
                 item["evidence"] = artifact or item.get("evidence", "")
     worklist_path.write_text(dump_worklist(worklist), encoding="utf-8")
 
@@ -355,7 +355,7 @@ def build_close_evidence(project, run_id, state):
         result_path = stage_result_path(directory, stage)
         entry = {
             "status": state.get("stages", {}).get(stage, "PENDING"),
-            "stage_result": f".loopx/runs/{run_id}/stage-results/{STAGE_RESULT_FILES[stage]}",
+            "stage_result": f"docs/loopx/runs/{run_id}/stage-results/{STAGE_RESULT_FILES[stage]}",
             "evidence": [],
         }
         if result_path.exists():
@@ -383,7 +383,7 @@ def build_close_evidence(project, run_id, state):
 
 def repair_ticket_root(project, run_id, state=None):
     state = state or load_state(project, run_id)
-    path = Path(state.get("repair_tickets") or f".loopx/runs/{run_id}/repair-tickets")
+    path = Path(state.get("repair_tickets") or f"docs/loopx/runs/{run_id}/artifacts/repair-tickets")
     if not path.is_absolute():
         path = project / path
     return path
@@ -656,7 +656,7 @@ def validate_run(project, run_id, strict=False):
         if status not in STAGE_STATUSES:
             errors.append(f"stages.{stage} has invalid status {status}")
 
-    worklist_rel = state.get("worklist") or f".loopx/runs/{run_id}/worklist.yml"
+    worklist_rel = state.get("worklist") or f"docs/loopx/runs/{run_id}/worklist.yml"
     worklist_path = Path(worklist_rel)
     if not worklist_path.is_absolute():
         worklist_path = project / worklist_path
@@ -729,7 +729,7 @@ def cmd_init(args, stdout):
     directory.mkdir(parents=True)
     (directory / "artifacts").mkdir()
     (directory / "stage-results").mkdir()
-    (directory / "repair-tickets").mkdir()
+    (directory / "artifacts" / "repair-tickets").mkdir()
 
     state = {
         "run_id": run_id,
@@ -743,9 +743,9 @@ def cmd_init(args, stdout):
         "risk_tags": risk_tags,
         "confirmation_policy": "verification_gated",
         "max_auto_repair": 2,
-        "worklist": f".loopx/runs/{run_id}/worklist.yml",
-        "events": f".loopx/runs/{run_id}/events.jsonl",
-        "repair_tickets": f".loopx/runs/{run_id}/repair-tickets",
+        "worklist": f"docs/loopx/runs/{run_id}/worklist.yml",
+        "events": f"docs/loopx/runs/{run_id}/events.jsonl",
+        "repair_tickets": f"docs/loopx/runs/{run_id}/artifacts/repair-tickets",
         "loop_attempts": {},
         "stages": {},
         "interview": interview_state(run_id, mode),

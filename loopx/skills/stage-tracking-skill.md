@@ -6,7 +6,7 @@
 
 ## 输入
 
-- `.loopx/runs/<run_id>/state.json`、`worklist.yml`、`stage-results/*.json`、当前阶段和阻塞项。
+- `docs/loopx/runs/<run_id>/state.json`、`worklist.yml`、`stage-results/*.json`、当前阶段和阻塞项。
 
 ## 步骤
 

@@ -17,7 +17,7 @@
 - `schemas/`：运行状态、worklist、阶段结果、health、interview、spec、mode、tracking 契约。
 - `health.yml`、`risk.yml`、`project-profiles.yml`：策略配置。
 - `tools/loopx_controller.py`：本地状态控制器。
-- `.loopx/runs/<run_id>/`：运行状态、worklist、事件、阶段结果和返工任务。
+- `docs/loopx/runs/<run_id>/`：controller 状态、worklist、events、stage-results 和自动生成 artifact。
 
 ## 状态控制器
 

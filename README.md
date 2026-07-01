@@ -40,7 +40,7 @@ request
   -> release readiness
 ```
 
-The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `.loopx/runs/<run_id>/`, including state, events, stage results, worklists, repair tickets, and generated artifacts.
+The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `docs/loopx/runs/<run_id>/`, limited to controller state, worklists, events, stage results, and generated artifacts.
 
 ## Install
 

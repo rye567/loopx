@@ -7,7 +7,7 @@
 ## 输入
 
 - 用户请求或 run id。
-- `.loopx/runs/<run_id>/state.json`、`worklist.yml`、阶段结果。
+- `docs/loopx/runs/<run_id>/state.json`、`worklist.yml`、阶段结果。
 - LoopX 标准、skill 和项目 harness。
 
 ## 门禁

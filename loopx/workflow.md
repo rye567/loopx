@@ -25,7 +25,7 @@
 
 ## 写入硬门禁
 
-- 阶段文档和分析文档可以在对应阶段写入，统一写入项目根目录下的 `docs/loopx/<date>-<slug>/`；`.loopx/runs/<run_id>/` 只用于 controller 状态、worklist、events、stage-results 和自动生成 artifact。
+- 阶段文档和分析文档可以在对应阶段写入，统一写入项目根目录下的 `docs/loopx/<date>-<slug>/`；`docs/loopx/runs/<run_id>/` 只用于 controller 状态、worklist、events、stage-results 和自动生成 artifact。
 - 未声明执行深度前，不得进行开发写入。
 - `STANDARD` 和 `FULL` 未通过方案审核，不得进入开发；未通过测试用例审核，不得进入开发。
 - `STANDARD` 和 `FULL` 只有到 `10. 开发` 且上游门禁满足时，才允许开发写入。
@@ -151,12 +151,12 @@ python tools/loopx_controller.py init "需求描述" --mode auto --risk-tags ten
 python tools/loopx_controller.py status
 python tools/loopx_controller.py status --tracking
 python tools/loopx_controller.py interview <run_id>
-# 回答 interview 命令输出的问题，并把回答写入 .loopx/runs/<run_id>/artifacts/interview.md 后才能记录 PASS
-python tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence .loopx/runs/<run_id>/artifacts/interview.md
+# 回答 interview 命令输出的问题，并把回答写入 docs/loopx/runs/<run_id>/artifacts/interview.md 后才能记录 PASS
+python tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence docs/loopx/runs/<run_id>/artifacts/interview.md
 python tools/loopx_controller.py confirm-stage --run-id <run_id> --stage requirement_interview --evidence "user confirmed interview"
 python tools/loopx_controller.py spec <run_id>
-python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
-python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence .loopx/runs/<run_id>/artifacts/spec.md
+python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence docs/loopx/runs/<run_id>/artifacts/spec.md
+python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence docs/loopx/runs/<run_id>/artifacts/spec.md
 python tools/loopx_controller.py mode <run_id> --select FULL
 python tools/loopx_controller.py next <run_id>
 python tools/loopx_controller.py validate
@@ -174,7 +174,7 @@ python tools/loopx_controller.py close-repair --item W1 --artifact stage-results
 python tools/loopx_controller.py can-write --kind business
 ```
 
-控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`init` 会自动写入 `stage-results/00-environment-check.json` 并把当前阶段推进到 `requirement_intake`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
+控制器的最小状态目录为 `docs/loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `artifacts/`。`init` 会自动写入 `stage-results/00-environment-check.json` 并把当前阶段推进到 `requirement_intake`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
 
 `validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 必须已确认通过。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
 

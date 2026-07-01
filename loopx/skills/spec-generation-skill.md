@@ -20,7 +20,7 @@
 
 ## 输出
 
-- `.loopx/runs/<run_id>/artifacts/spec.md`、规格门禁初始结论和阶段结果。
+- `docs/loopx/runs/<run_id>/artifacts/spec.md`、规格门禁初始结论和阶段结果。
 
 ## 通过标准
 

@@ -24,7 +24,7 @@ python loopx/tools/loopx_controller.py status --tracking
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-5. 阶段文档和分析文档必须写入项目根目录下的 `docs/loopx/<date>-<slug>/`；`.loopx/runs/<run_id>/` 只存控制器状态、worklist、events、stage-results 和自动生成 artifact。
+5. 阶段文档和分析文档必须写入项目根目录下的 `docs/loopx/<date>-<slug>/`；`docs/loopx/runs/<run_id>/` 只存控制器状态、worklist、events、stage-results 和自动生成 artifact。
 6. Review 不通过或用户指出问题时，必须创建返工任务并回到 owner 阶段：
 
 ```bash

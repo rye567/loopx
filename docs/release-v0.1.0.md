@@ -6,7 +6,7 @@ LoopX Kit v0.1.0 is the first public release of the cross-tool quality gate skil
 
 - Shared `loopx/` skill source for Codex and Claude Code.
 - Stage-based workflow from requirement intake through release readiness.
-- Local controller for persistent run state under `.loopx/runs/<run_id>/`.
+- Local controller for persistent run state under `docs/loopx/runs/<run_id>/`.
 - JSON schemas for state, stage results, tracking, mode selection, specs, and interviews.
 - Role instructions for requirement, design, review, testing, implementation, validation, and release stages.
 - Templates for staged artifacts and final reports.

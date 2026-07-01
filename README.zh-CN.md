@@ -40,7 +40,7 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
   -> 发布准备
 ```
 
-完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。控制器会把每次运行持久化到 `.loopx/runs/<run_id>/`，包括状态、事件、阶段结果、工作清单、返工任务和生成产物。
+完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。控制器会把每次运行持久化到 `docs/loopx/runs/<run_id>/`，仅存 controller 状态、worklist、events、stage-results 和自动生成 artifact。
 
 ## 安装
 
