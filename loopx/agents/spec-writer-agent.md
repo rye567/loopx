@@ -17,7 +17,7 @@
 - 提交给 spec-reviewer-agent 的评审材料。
 - `stage_result`，状态为 `PASS`、`CHANGES_REQUIRED` 或 `BLOCKED`。
 
-## 门禁
+## 检查
 
 - 区分已确认事实和待确认假设。
 - `requirement_interview` 未确认、访谈仍有未回答问题或 `interview.md` 仍含模板占位时，不得生成 Spec。

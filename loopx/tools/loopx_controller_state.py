@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""LoopX run state and tracking helpers.
+
+本模块只负责构造和展示状态，不直接推进阶段；阶段流转统一放在
+loopx_controller_flow.py，避免写入规则散在多个文件里。
+"""
+
+import json
+import re
+from datetime import datetime
+
+from loopx_controller_contracts import (
+    PASSING_STATUSES,
+    STAGE_DISPLAY_NAMES,
+    STAGE_RESULT_FILES,
+    STAGE_SEQUENCE,
+)
+from loopx_controller_io import load_worklist, loopx_root, run_root
+from loopx_controller_yaml import YamlSubsetError, dump_worklist, parse_yaml_subset
+
+
+def slugify(text):
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
+    return slug[:48] or "loopx-run"
+
+
+def default_run_id(requirement):
+    return f"{datetime.now().strftime('%Y-%m-%d')}-{slugify(requirement)}"
+
+
+def yaml_string(value):
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def render_worklist(run_id, requirement, mode):
+    stage_lines = []
+    for index, stage in enumerate(STAGE_SEQUENCE):
+        stage_lines.extend([
+            f"  - id: {yaml_string(f'{index:02d}')}",
+            f"    stage: {stage}",
+            f"    name: {STAGE_DISPLAY_NAMES[stage]}",
+            "    status: PENDING",
+            "    required: true",
+            "    evidence: \"\"",
+        ])
+    return f"""run:
+  id: {yaml_string(run_id)}
+  requirement: {yaml_string(requirement)}
+  mode: {mode}
+  status: ACTIVE
+  current_stage: environment_check
+  next_action: requirement_intake
+
+spec:
+  status: NOT_CREATED
+  path: {yaml_string(f"docs/loopx/runs/{run_id}/artifacts/spec.md")}
+  approved: false
+
+interview:
+  status: NOT_STARTED
+  unanswered_questions: 0
+  path: {yaml_string(f"docs/loopx/runs/{run_id}/artifacts/interview.md")}
+
+stages:
+{chr(10).join(stage_lines)}
+
+items: []
+"""
+
+
+def risk_config():
+    return parse_yaml_subset((loopx_root() / "risk.yml").read_text(encoding="utf-8"))
+
+
+def resolve_mode(mode, risk_tags):
+    if mode != "auto":
+        return mode
+    config = risk_config()
+    critical = set(config.get("critical_triggers", []))
+    score_rules = config.get("score_rules", {})
+    thresholds = config.get("thresholds", {})
+    if critical.intersection(risk_tags):
+        return "FULL"
+    score = sum(int(score_rules.get(tag, 0)) for tag in risk_tags)
+    if score >= int(thresholds.get("full_min", 6)):
+        return "FULL"
+    if score <= int(thresholds.get("light_max", 1)):
+        return "LIGHT"
+    return "STANDARD"
+
+
+def mode_rank(mode):
+    return {"LIGHT": 1, "STANDARD": 2, "FULL": 3}.get(mode, 0)
+
+
+def interview_state(run_id, mode):
+    return {
+        "required": True,
+        "mode": mode,
+        "status": "NOT_STARTED",
+        "artifact": f"docs/loopx/runs/{run_id}/artifacts/interview.md",
+        "unanswered_questions": 0,
+        "can_skip": False,
+    }
+
+
+def spec_state(run_id):
+    return {
+        "required": True,
+        "status": "NOT_CREATED",
+        "artifact": f"docs/loopx/runs/{run_id}/artifacts/spec.md",
+        "approved": False,
+        "gate_result": "PENDING",
+    }
+
+
+def mode_decision_state(mode, risk_tags, selected_by):
+    confirmed = selected_by != "auto"
+    return {
+        "recommended": mode,
+        "selected": mode if confirmed else "",
+        "selection_status": "CONFIRMED" if confirmed else "NEED_HUMAN",
+        "selected_by": selected_by,
+        "reason": risk_tags,
+        "accepted_risk": {
+            "selected_lower_than_recommended": False,
+            "reason": "",
+        },
+    }
+
+
+def transition_policy_state():
+    return {
+        "require_interview_before_spec": True,
+        "require_spec_before_design": True,
+        "require_mode_before_design": True,
+        "require_design_review_before_development": True,
+        "require_git_gate_before_final_report": True,
+    }
+
+
+def tracking_state(run_id):
+    return {
+        "show_on_every_update": True,
+        "worklist": f"docs/loopx/runs/{run_id}/worklist.yml",
+    }
+
+
+def update_worklist_state(project, state, stage=None, stage_status=None):
+    # worklist 是给人和 agent 看的同步视图，真实状态仍以 state.json 为准。
+    try:
+        worklist_path, worklist = load_worklist(project, state)
+    except (FileNotFoundError, YamlSubsetError):
+        return
+    worklist.setdefault("run", {})["current_stage"] = state.get("current_stage")
+    worklist["run"]["next_action"] = state.get("next_action", "")
+    if "spec" in state:
+        worklist["spec"] = {
+            "status": state["spec"].get("status", ""),
+            "path": state["spec"].get("artifact", ""),
+            "approved": state["spec"].get("approved", False),
+        }
+    if "interview" in state:
+        worklist["interview"] = {
+            "status": state["interview"].get("status", ""),
+            "unanswered_questions": state["interview"].get("unanswered_questions", 0),
+            "path": state["interview"].get("artifact", ""),
+        }
+    if stage and "stages" in worklist:
+        for item in worklist.get("stages") or []:
+            if item.get("stage") == stage:
+                item["status"] = stage_status or item.get("status", "PENDING")
+                artifact = ""
+                if stage == "requirement_interview":
+                    artifact = state.get("interview", {}).get("artifact", "")
+                if stage in {"spec_draft", "spec_review"}:
+                    artifact = state.get("spec", {}).get("artifact", "")
+                if not artifact and stage in STAGE_RESULT_FILES:
+                    artifact = f"docs/loopx/runs/{state.get('run_id')}/stage-results/{STAGE_RESULT_FILES[stage]}"
+                item["evidence"] = artifact or item.get("evidence", "")
+    worklist_path.write_text(dump_worklist(worklist), encoding="utf-8")
+
+
+def build_tracking_snapshot(state):
+    current = state.get("current_stage", "")
+    completed = state.get("stages", {})
+    snapshot = []
+    for index, stage in enumerate(STAGE_SEQUENCE):
+        snapshot.append({
+            "id": f"{index:02d}",
+            "stage": stage,
+            "name": STAGE_DISPLAY_NAMES[stage],
+            "status": completed.get(stage, "IN_PROGRESS" if stage == current else "PENDING"),
+        })
+    return snapshot
+
+
+def format_tracking(state):
+    lines = [
+        "LoopX 追踪",
+        "",
+        f"运行: {state.get('run_id')}",
+        f"模式: {state.get('mode')}",
+        f"当前阶段: {STAGE_DISPLAY_NAMES.get(state.get('current_stage'), state.get('current_stage'))}",
+        f"需求规格: {state.get('spec', {}).get('status', 'UNKNOWN')}",
+        "Git 检查: PENDING",
+        "",
+        "阶段:",
+    ]
+    current = state.get("current_stage")
+    statuses = state.get("stages", {})
+    for index, stage in enumerate(STAGE_SEQUENCE):
+        status = statuses.get(stage)
+        marker = "[>]" if stage == current else "[x]" if status in PASSING_STATUSES else "[ ]"
+        lines.append(f"{marker} {index:02d} {STAGE_DISPLAY_NAMES[stage]}")
+    return "\n".join(lines) + "\n"
+
+
+def latest_run_id(project):
+    root = run_root(project)
+    if not root.exists():
+        return None
+    runs = [path for path in root.iterdir() if path.is_dir()]
+    if not runs:
+        return None
+    return max(runs, key=lambda path: path.stat().st_mtime).name
+
+
+def resolve_run_id(project, run_id):
+    if run_id:
+        return run_id
+    resolved = latest_run_id(project)
+    if not resolved:
+        raise ValueError("no LoopX runs found")
+    return resolved

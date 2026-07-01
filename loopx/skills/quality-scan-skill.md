@@ -16,7 +16,7 @@
 
 ## 输出
 
-- 质量报告、门禁结果和带 `return_to` 的 required actions。
+- 质量报告、检查结果和带 `return_to` 的 required actions。
 
 ## 通过标准
 

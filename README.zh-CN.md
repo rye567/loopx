@@ -1,10 +1,10 @@
 # LoopX Kit
 
-AI 编程 Agent 的工程质量门。
+AI 编程 Agent 的阶段化工程工作流。
 
 [English README](README.md)
 
-LoopX 是一个用 Git 维护的 Codex / Claude Code 通用 skill 包。它把 AI 编程任务从“收到需求就开始改代码”拉回到可审计的工程流程：需求采访、规格说明、人工确认的方案评审、测试设计、实现、代码评审和发布门禁。
+LoopX 是一个用 Git 维护的 Codex / Claude Code 通用 skill 包。它把 AI 编程任务从“收到需求就开始改代码”拉回到可审计的工程流程：需求采访、规格说明、人工确认的方案评审、测试设计、实现、代码评审和发布检查。
 
 当 Agent 要修改跨模块行为、API 契约、权限边界、租户隔离、状态机、SQL/MQ 流程，或者任何“看起来完成了”还不够的变更时，就适合使用 LoopX。
 
@@ -18,7 +18,7 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
 | 验收标准靠聊天上下文隐含 | 生成并评审明确的 Spec |
 | 评审容易被口头带过 | 评审门必须记录证据 |
 | 高风险写入过早发生 | 评审门通过前阻止业务写入 |
-| “完成”只是一句聊天回复 | 最终门禁记录本地验证、风险缺口和发布准备度 |
+| “完成”只是一句聊天回复 | 收口检查记录本地验证、风险缺口和发布准备度 |
 
 ## 工作流
 
@@ -40,7 +40,7 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
   -> 发布准备
 ```
 
-完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。控制器会把每次运行持久化到 `docs/loopx/runs/<run_id>/`，仅存 controller 状态、worklist、events、stage-results 和自动生成 artifact。
+完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。控制器会把每次运行持久化到 `docs/loopx/runs/<run_id>/`，仅存 controller 状态、worklist、events、stage-results 和自动生成 artifact。LoopX 也可以在收口前记录 Compound Capture 决策：无复用价值时 skipped，有价值且显式允许时 captured 到 `docs/loopx/solutions/<category>/<slug>.md`。
 
 ## 安装
 
@@ -86,7 +86,7 @@ Claude Code: /loopx 处理这个需求：...
 如果项目内需要提示 Agent 使用 LoopX，可以在项目文档中加入：
 
 ```text
-当用户要求 LoopX、质量门或完整阶段化交付时，使用已安装的 loopx skill。先读取当前项目 README、构建文件、主要配置、源码结构和测试目录，再按 LoopX 阶段执行。
+当用户要求 LoopX、阶段化交付或结构化工程审核时，使用已安装的 loopx skill。先读取当前项目 README、构建文件、主要配置、源码结构和测试目录，再按 LoopX 阶段执行。
 ```
 
 ## 控制器快速开始
@@ -103,7 +103,7 @@ python loopx/tools/loopx_controller.py init "增加租户级 API 访问控制" -
 python loopx/tools/loopx_controller.py status --tracking
 ```
 
-执行验证和门禁：
+执行验证和检查：
 
 ```bash
 python loopx/tools/loopx_controller.py validate --strict
@@ -124,7 +124,7 @@ python loopx/tools/loopx_controller.py can-write --kind business
 - `loopx/workflow.md`：阶段化工作流契约
 - `loopx/agents/`：各质量阶段的角色说明
 - `loopx/templates/`：需求采访、Spec、评审和发布报告模板
-- `loopx/schemas/`：状态、阶段结果、追踪、模式选择和 Spec 的 JSON Schema
+- `loopx/schemas/`：状态、阶段结果、追踪、模式选择、Spec 和复利沉淀的 JSON Schema
 - `loopx/tools/loopx_controller.py`：本地状态控制器
 - `loopx/tools/loopx_check.py`：健康检查和包检查
 - `tests/`：控制器和 skill 包的回归测试
@@ -147,7 +147,7 @@ LoopX 可能不适合：
 
 ## 推荐 GitHub Topics
 
-`codex`, `claude-code`, `ai-agents`, `agent-workflow`, `quality-gate`, `developer-tools`, `automation`, `python`, `prompt-engineering`
+`codex`, `claude-code`, `ai-agents`, `agent-workflow`, `staged-workflow`, `developer-tools`, `automation`, `python`, `prompt-engineering`
 
 ## 更新
 

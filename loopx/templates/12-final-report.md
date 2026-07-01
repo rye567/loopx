@@ -19,11 +19,19 @@
 | 单元测试 |  |  |  |
 | 定向测试 |  |  |  |
 | 健康门 |  |  |  |
+| Compound Capture |  |  |  |
 | CI / 远端 |  |  |  |
 
 ## 风险和已接受缺口
 
 -
+
+## 复利沉淀
+
+- 决策：captured / skipped
+- run artifact：
+- project doc：
+- 跳过原因或复用学习摘要：
 
 ## 发布 / 下一步
 

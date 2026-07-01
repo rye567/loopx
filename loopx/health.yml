@@ -12,6 +12,7 @@ health:
     - validation_evidence_exists
     - cleanup_verified
     - ci_gap_declared
+    - compound_capture_decision_recorded
 
   result_status:
     pass: PASS

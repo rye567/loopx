@@ -16,7 +16,7 @@
 - 保留/跳过阶段、最小验证要求和下一阶段 owner。
 - `stage_result`，状态为 `PASS`、`CHANGES_REQUIRED` 或 `BLOCKED`。
 
-## 门禁
+## 检查
 
 - 规格未 `PASS` 时返回 `BLOCKED`。
 - 命中 API 契约、SQL/MQ、权限、租户、核心状态、跨模块、迁移或不可逆变更时选择 `FULL`。

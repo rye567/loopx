@@ -1,10 +1,10 @@
 # LoopX Kit
 
-Quality gates for AI coding agents.
+Staged workflow checks for AI coding agents.
 
 [中文说明](README.zh-CN.md)
 
-LoopX is a Git-maintained skill package for Codex and Claude Code. It keeps AI coding work from jumping straight into implementation by forcing risky changes through requirement interview, spec drafting, human-confirmed reviews, test planning, implementation, and release gates.
+LoopX is a Git-maintained skill package for Codex and Claude Code. It keeps AI coding work from jumping straight into implementation by guiding risky changes through requirement interview, spec drafting, human-confirmed reviews, test planning, implementation, and release checks.
 
 Use it when an agent is about to touch cross-module behavior, API contracts, permissions, tenant boundaries, state machines, SQL/MQ flows, or anything where "looks done" is not good enough.
 
@@ -16,9 +16,9 @@ AI coding agents are fast, but they often skip requirements, invent acceptance c
 | --- | --- |
 | Agent starts coding from a vague prompt | Agent starts with requirement intake and interview |
 | Acceptance criteria are implied | Spec artifacts are generated and reviewed |
-| Reviews can be hand-waved | Review gates require recorded evidence |
-| High-risk edits happen too early | Business writes are blocked until review gates pass |
-| "Done" is a chat message | Final gate records local checks, gaps, and release readiness |
+| Reviews can be hand-waved | Reviews require recorded evidence |
+| High-risk edits happen too early | Business writes wait until review checks pass |
+| "Done" is a chat message | Final check records local checks, gaps, and release readiness |
 
 ## Workflow
 
@@ -40,7 +40,7 @@ request
   -> release readiness
 ```
 
-The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `docs/loopx/runs/<run_id>/`, limited to controller state, worklists, events, stage results, and generated artifacts.
+The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `docs/loopx/runs/<run_id>/`, limited to controller state, worklists, events, stage results, and generated artifacts. LoopX can also record a Compound Capture decision before close: skipped when there is no reusable learning, or captured into `docs/loopx/solutions/<category>/<slug>.md` when explicitly enabled.
 
 ## Install
 
@@ -84,7 +84,7 @@ Claude Code: /loopx handle this requirement: ...
 For project-local reminders, add a short note to your project docs:
 
 ```text
-When the user asks for LoopX, quality gates, or full staged delivery, use the installed loopx skill. Read the current project README, build files, primary configuration, source layout, and tests before running the LoopX stages.
+When the user asks for LoopX, staged delivery, or structured engineering review, use the installed loopx skill. Read the current project README, build files, primary configuration, source layout, and tests before running the LoopX stages.
 ```
 
 ## Controller Quickstart
@@ -101,7 +101,7 @@ Inspect progress:
 python loopx/tools/loopx_controller.py status --tracking
 ```
 
-Run validation and gates:
+Run validation and checks:
 
 ```bash
 python loopx/tools/loopx_controller.py validate --strict
@@ -110,7 +110,7 @@ python loopx/tools/loopx_controller.py git-gate <run_id>
 python loopx/tools/loopx_controller.py close <run_id>
 ```
 
-Before writing business logic, LoopX expects the relevant human-confirmed review gates to pass:
+Before writing business logic, LoopX expects the relevant human-confirmed reviews to pass:
 
 ```bash
 python loopx/tools/loopx_controller.py can-write --kind business
@@ -122,7 +122,7 @@ python loopx/tools/loopx_controller.py can-write --kind business
 - `loopx/workflow.md`: the staged workflow contract
 - `loopx/agents/`: role instructions for each quality stage
 - `loopx/templates/`: artifact templates for interviews, specs, reviews, and release reports
-- `loopx/schemas/`: JSON schemas for state, stage results, tracking, mode selection, and specs
+- `loopx/schemas/`: JSON schemas for state, stage results, tracking, mode selection, specs, and compound learnings
 - `loopx/tools/loopx_controller.py`: the local state controller
 - `loopx/tools/loopx_check.py`: health and package checks
 - `tests/`: regression tests for the controller and skill package
@@ -145,7 +145,7 @@ LoopX is probably too heavy for:
 
 ## Recommended GitHub Topics
 
-`codex`, `claude-code`, `ai-agents`, `agent-workflow`, `quality-gate`, `developer-tools`, `automation`, `python`, `prompt-engineering`
+`codex`, `claude-code`, `ai-agents`, `agent-workflow`, `staged-workflow`, `developer-tools`, `automation`, `python`, `prompt-engineering`
 
 ## Update
 

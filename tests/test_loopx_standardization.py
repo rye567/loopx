@@ -24,7 +24,7 @@ class LoopXStandardizationTest(unittest.TestCase):
         messages = "\n".join(f"{item.name}: {item.message}" for item in report.checks)
         self.assertEqual(report.status, self.check.PASS, messages)
 
-    def test_each_required_standard_declares_gate_language(self):
+    def test_each_required_standard_declares_check_language(self):
         base = ROOT / "loopx" / "standards"
         for name in self.check.REQUIRED_STANDARDS:
             with self.subTest(name=name):
@@ -71,7 +71,7 @@ class LoopXStandardizationTest(unittest.TestCase):
         for name in required:
             with self.subTest(name=name):
                 text = (base / name).read_text(encoding="utf-8")
-                for term in ("职责", "输入", "输出", "门禁", "禁止事项"):
+                for term in ("职责", "输入", "输出", "检查", "禁止事项"):
                     self.assertIn(term, text)
                 self.assertIn("不得", text)
 

@@ -11,7 +11,7 @@
 - 本地验证、CI/远端未覆盖、上线顺序和回滚路径。
 - worklist 更新和 `stage_result`。
 
-## 门禁
+## 检查
 
 - 需求边界不清返回 `BLOCKED`。
 - 方案自身需补充返回 `CHANGES_REQUIRED` 且 `return_to: 方案设计`。

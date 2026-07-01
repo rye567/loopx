@@ -12,7 +12,7 @@
 - 本地服务、mock、三方工具缺口及其 `SKIPPED`、`CI_REQUIRED` 或 `BLOCKED` 归类。
 - worklist 更新和 `stage_result`。
 
-## 门禁
+## 检查
 
 - 清理失败不能标记为 `PASS`。
 - 方案不可测试或验收标准不清时返回 `CHANGES_REQUIRED` 或 `BLOCKED`。

@@ -82,6 +82,9 @@
     "git_gate": {
       "type": "object"
     },
+    "compound_capture": {
+      "type": "object"
+    },
     "stages": {
       "type": "object"
     }

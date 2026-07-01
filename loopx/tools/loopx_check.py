@@ -41,6 +41,7 @@ REQUIRED_SKILLS = [
     "test-design-skill.md",
     "quality-scan-skill.md",
     "release-check-skill.md",
+    "compound-capture-skill.md",
 ]
 
 REQUIRED_AGENT_DOCS = [
@@ -62,6 +63,7 @@ REQUIRED_TEMPLATES = [
     "tracking-snapshot.md",
     "11-release-readiness.md",
     "12-final-report.md",
+    "13-compound-capture.md",
 ]
 
 REQUIRED_SCHEMAS = [
@@ -73,6 +75,7 @@ REQUIRED_SCHEMAS = [
     "mode.schema.json",
     "tracking.schema.json",
     "health-result.schema.json",
+    "compound-learning.schema.json",
 ]
 
 FORBIDDEN_SOURCE_PATTERNS = [
@@ -155,7 +158,7 @@ def check_skill_contracts(root: Path) -> CheckResult:
     return CheckResult(
         name="技能契约",
         status=PASS,
-        message="所有必需技能均声明输入、输出和门禁契约。",
+        message="所有必需技能均声明输入、输出和检查契约。",
         evidence=[str(base / name) for name in REQUIRED_SKILLS if (base / name).exists()],
     )
 

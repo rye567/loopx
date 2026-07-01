@@ -722,6 +722,29 @@ LIGHT.
             str(self.tmp),
         ], stdout=out)
 
+        self.assertEqual(code, 1)
+        self.assertIn("state.compound_capture.decision must be captured or skipped before final_report PASS", out.getvalue())
+
+        self.controller.main([
+            "compound",
+            "strict-final-run",
+            "--decision",
+            "skipped",
+            "--reason",
+            "最终报告收口测试不产生长期复用学习。",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "validate",
+            "strict-final-run",
+            "--strict",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
         self.assertEqual(code, 0)
 
     def test_git_gate_command_records_git_status_summary(self):
@@ -776,6 +799,116 @@ LIGHT.
         self.assertIn("NEED_HUMAN git gate git-gate-no-repo-run", out.getvalue())
         state = json.loads((self.tmp / "docs" / "loopx" / "runs" / "git-gate-no-repo-run" / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["git_gate"]["status"], "NEED_HUMAN")
+
+    def test_compound_records_skip_decision_in_run_artifact(self):
+        self.controller.main([
+            "init",
+            "Docs only update",
+            "--run-id",
+            "compound-skip-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "compound",
+            "compound-skip-run",
+            "--decision",
+            "skipped",
+            "--reason",
+            "文档路径改名，没有可复用缺陷或流程经验。",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        artifact = self.run_dir("compound-skip-run") / "artifacts" / "compound-capture.md"
+        state = self.read_state("compound-skip-run")
+        self.assertEqual(code, 0)
+        self.assertTrue(artifact.exists())
+        self.assertIn("decision: skipped", artifact.read_text(encoding="utf-8"))
+        self.assertIn("文档路径改名", artifact.read_text(encoding="utf-8"))
+        self.assertEqual(state["compound_capture"]["decision"], "skipped")
+        self.assertEqual(state["compound_capture"]["artifact"], "docs/loopx/runs/compound-skip-run/artifacts/compound-capture.md")
+        self.assertEqual(state["compound_capture"]["project_doc"], "")
+        self.assertFalse((self.tmp / "docs" / "loopx" / "solutions").exists())
+        self.assertIn("PASS compound capture compound-skip-run", out.getvalue())
+        self.assertIn("decision: skipped", out.getvalue())
+
+    def test_compound_writes_project_learning_doc_when_explicitly_enabled(self):
+        self.controller.main([
+            "init",
+            "Prevent interview auto pass",
+            "--run-id",
+            "compound-captured-run",
+            "--risk-tags",
+            "api_contract",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "compound",
+            "compound-captured-run",
+            "--decision",
+            "captured",
+            "--category",
+            "workflow",
+            "--title",
+            "Interview gate requires answered artifact",
+            "--summary",
+            "需求采访必须先展示问题并写入回答。",
+            "--learning",
+            "只生成 spec 文档会绕过需求确认，必须让 interview artifact 不含未回答占位。",
+            "--prevention",
+            "record-stage requirement_interview PASS 前校验 interview.md 的回答状态。",
+            "--applies-to",
+            "loopx/tools",
+            "--write-project-doc",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        artifact = self.run_dir("compound-captured-run") / "artifacts" / "compound-capture.md"
+        project_doc = self.tmp / "docs" / "loopx" / "solutions" / "workflow" / "interview-gate-requires-answered-artifact.md"
+        state = self.read_state("compound-captured-run")
+        self.assertEqual(code, 0)
+        self.assertTrue(artifact.exists())
+        self.assertTrue(project_doc.exists())
+        text = project_doc.read_text(encoding="utf-8")
+        self.assertIn("decision: captured", text)
+        self.assertIn("risk_tags:", text)
+        self.assertIn("  - api_contract", text)
+        self.assertIn("applies_to:", text)
+        self.assertIn("  - loopx/tools", text)
+        self.assertIn("## Learning", text)
+        self.assertEqual(state["compound_capture"]["decision"], "captured")
+        self.assertEqual(state["compound_capture"]["project_doc"], "docs/loopx/solutions/workflow/interview-gate-requires-answered-artifact.md")
+        self.assertIn("project_doc: docs/loopx/solutions/workflow/interview-gate-requires-answered-artifact.md", out.getvalue())
+
+    def test_validate_learning_rejects_missing_required_frontmatter(self):
+        bad_doc = self.tmp / "bad-learning.md"
+        bad_doc.write_text("""---
+run_id: bad-run
+decision: captured
+---
+
+# Missing fields
+""", encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "validate-learning",
+            str(bad_doc),
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL learning", out.getvalue())
+        self.assertIn("frontmatter.title is required", out.getvalue())
+        self.assertIn("frontmatter.summary is required", out.getvalue())
 
     def test_strict_validate_rejects_worklist_stage_status_drift(self):
         self.controller.main([
@@ -914,6 +1047,16 @@ LIGHT.
             str(self.tmp),
         ], stdout=io.StringIO())
 
+        self.controller.main([
+            "compound",
+            "close-run",
+            "--decision",
+            "skipped",
+            "--reason",
+            "关闭流程测试不产生长期复用学习。",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -932,6 +1075,7 @@ LIGHT.
         evidence = json.loads((run_dir / "artifacts" / "close-evidence.json").read_text(encoding="utf-8"))
         self.assertEqual(evidence["run_id"], "close-run")
         self.assertEqual(evidence["git_gate"]["diff_summary"], "M README.md")
+        self.assertEqual(evidence["compound_capture"]["decision"], "skipped")
         self.assertIn("final_report", evidence["evidence_matrix"])
         self.assertIn("CI/remote verification not covered by local close", evidence["uncovered"])
 

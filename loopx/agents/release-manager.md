@@ -13,7 +13,7 @@
 - 符合 `standards/release-standard.md` 的发布就绪产物。
 - 回滚、监控、剩余风险和批准请求。
 
-## 门禁
+## 检查
 
 - 只准备发布证据。
 - 没有明确批准时，不得 commit、push、deploy 或修改生产系统。

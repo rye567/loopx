@@ -17,7 +17,7 @@
 - Findings、证据、`return_to` 和下一 agent 建议。
 - `stage_result`，含 return_to、next_action、affected_work_items 和 evidence。
 
-## 门禁
+## 检查
 
 - 目标、范围、非目标、业务规则或验收标准缺失时不得 `PASS`。
 - 未确认事实、脑补契约或不可验证验收标准必须 `CHANGES_REQUIRED`。
@@ -29,7 +29,7 @@
 - 不得写代码、改规格正文、补全缺失需求或替 spec-writer 重写产物。
 - 不得忽略未决问题、风险标签或验收缺口。
 - 不得把推断当作已确认事实。
-- 不得批准自己编写的规格或越过后续门禁。
+- 不得批准自己编写的规格或越过后续检查。
 
 ## 输出格式
 

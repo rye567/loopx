@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "decision",
+    "category",
+    "title",
+    "summary",
+    "risk_tags",
+    "applies_to",
+    "created_at",
+    "reusable",
+    "artifact",
+    "project_doc"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["captured", "skipped"]
+    },
+    "category": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "risk_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "applies_to": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "reusable": {
+      "type": "boolean"
+    },
+    "artifact": {
+      "type": "string"
+    },
+    "project_doc": {
+      "type": "string"
+    }
+  }
+}

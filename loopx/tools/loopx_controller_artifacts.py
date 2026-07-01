@@ -76,7 +76,7 @@ def interview_questions(state):
             questions.append({
                 "priority": "P0",
                 "question": question,
-                "reason": f"风险标签 `{tag}` 会影响执行等级和后续门禁。",
+                "reason": f"风险标签 `{tag}` 会影响执行等级和后续放行条件。",
                 "blocking_stage": "spec_draft",
             })
     return questions
@@ -129,7 +129,7 @@ def render_interview_artifact(state):
 
 - 待用户回答。
 
-## 采访门禁
+## 采访检查
 
 ```yaml
 stage_result:

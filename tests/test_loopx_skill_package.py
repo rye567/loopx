@@ -23,12 +23,14 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertEqual(fields.get("name"), "loopx")
         description = fields.get("description", "")
         self.assertTrue(description.startswith("当用户"))
-        self.assertIn("质量门", description)
+        for phrase in ("质量门", "门禁", "闸门"):
+            self.assertNotIn(phrase, description)
         self.assertLessEqual(len(frontmatter), 1024)
         self.assertIn("# LoopX", body)
         for heading in ("## 入口", "## 必读资源", "## 执行流程", "## 状态控制器", "## 项目接入"):
             with self.subTest(heading=heading):
                 self.assertIn(heading, body)
+        self.assertLessEqual(len(text.splitlines()), 75)
 
     def test_skill_frontloads_gatekeeper_rules(self):
         text = (LOOPX / "SKILL.md").read_text(encoding="utf-8")
@@ -44,6 +46,8 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertIn("docs/loopx/<date>-<slug>/", text)
         self.assertIn("`validate PASS` 只代表结构合法", text)
         self.assertIn("返工任务", text)
+        for phrase in ("质量门", "门禁", "闸门"):
+            self.assertNotIn(phrase, text)
 
     def test_skill_references_existing_resources(self):
         text = (LOOPX / "SKILL.md").read_text(encoding="utf-8")
@@ -66,6 +70,9 @@ class LoopxSkillPackageTest(unittest.TestCase):
 
     def test_required_skill_resources_exist(self):
         self.assertGreaterEqual(len(list((LOOPX / "agents").glob("*.md"))), 9)
+        self.assertTrue((LOOPX / "skills" / "compound-capture-skill.md").exists())
+        self.assertTrue((LOOPX / "templates" / "13-compound-capture.md").exists())
+        self.assertTrue((LOOPX / "schemas" / "compound-learning.schema.json").exists())
         self.assertTrue((LOOPX / "templates" / "10-health-check.md").exists())
         self.assertTrue((LOOPX / "templates" / "worklist.yml").exists())
         self.assertTrue((LOOPX / "schemas" / "state.schema.json").exists())
@@ -144,6 +151,14 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertIn("docs/loopx/<date>-<slug>/", workflow)
         self.assertIn("docs/loopx/runs/<run_id>/", workflow)
 
+    def test_workflow_documents_compound_capture_paths(self):
+        workflow = (LOOPX / "workflow.md").read_text(encoding="utf-8")
+
+        self.assertIn("python tools/loopx_controller.py compound", workflow)
+        self.assertIn("docs/loopx/runs/<run_id>/artifacts/compound-capture.md", workflow)
+        self.assertIn("docs/loopx/solutions/<category>/<slug>.md", workflow)
+        self.assertNotIn("`.loopx" "/knowledge", workflow)
+
     def test_controller_entrypoint_is_thin_facade(self):
         entrypoint = LOOPX / "tools" / "loopx_controller.py"
         core = LOOPX / "tools" / "loopx_controller_core.py"
@@ -151,6 +166,11 @@ class LoopxSkillPackageTest(unittest.TestCase):
         io_helpers = LOOPX / "tools" / "loopx_controller_io.py"
         yaml_helpers = LOOPX / "tools" / "loopx_controller_yaml.py"
         artifact_helpers = LOOPX / "tools" / "loopx_controller_artifacts.py"
+        state_helpers = LOOPX / "tools" / "loopx_controller_state.py"
+        flow_helpers = LOOPX / "tools" / "loopx_controller_flow.py"
+        validation_helpers = LOOPX / "tools" / "loopx_controller_validation.py"
+        repair_helpers = LOOPX / "tools" / "loopx_controller_repair.py"
+        release_helpers = LOOPX / "tools" / "loopx_controller_release.py"
         text = entrypoint.read_text(encoding="utf-8")
 
         self.assertTrue(core.exists(), "controller implementation should live outside the CLI facade")
@@ -158,8 +178,13 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertTrue(io_helpers.exists(), "file and schema helpers should be split from command orchestration")
         self.assertTrue(yaml_helpers.exists(), "YAML/worklist helpers should be split from the controller core")
         self.assertTrue(artifact_helpers.exists(), "artifact rendering helpers should be split from the controller core")
+        for helper in (state_helpers, flow_helpers, validation_helpers, repair_helpers, release_helpers):
+            with self.subTest(helper=helper.name):
+                helper_text = helper.read_text(encoding="utf-8")
+                self.assertTrue(helper_text.startswith("#!/usr/bin/env python3\n\"\"\""))
+                self.assertIn("# ", helper_text, "split Python helpers should explain non-obvious process rules")
         self.assertLessEqual(len(text.splitlines()), 80)
-        self.assertLessEqual(len(core.read_text(encoding="utf-8").splitlines()), 1600)
+        self.assertLessEqual(len(core.read_text(encoding="utf-8").splitlines()), 900)
         self.assertIn("loopx_controller_core", text)
 
 

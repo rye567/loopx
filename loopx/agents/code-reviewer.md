@@ -12,7 +12,7 @@
 4. Verdict：`PASS`、`CHANGES_REQUIRED` 或 `BLOCKED`。
 5. Evidence：本地硬证据和 CI/远端未覆盖范围。
 
-## 门禁
+## 检查
 
 - 编译、测试、断言、清理验证是硬证据；未运行的 CI、远端环境和人工验收必须列为未覆盖。
 - 发现问题时返回 `CHANGES_REQUIRED` 且 `return_to: 开发`。

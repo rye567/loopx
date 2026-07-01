@@ -10,11 +10,11 @@
 - `docs/loopx/runs/<run_id>/state.json`、`worklist.yml`、阶段结果。
 - LoopX 标准、skill 和项目 harness。
 
-## 门禁
+## 检查
 
 - `CHANGES_REQUIRED`、`BLOCKED` 或 `NEED_HUMAN` 不得自动推进。
 - LLM 审核文字不是硬证据。
-- 执行深度和上游门禁无效时不得允许开发写入。
+- 执行深度和上游放行条件无效时不得允许开发写入。
 - commit、push、deploy、破坏性删除、生产写入等高风险动作必须人工确认。
 
 ## 输出
