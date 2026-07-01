@@ -711,17 +711,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        self.controller.main([
-            "confirm-stage",
-            "--run-id",
-            "strict-final-run",
-            "--stage",
-            "release_readiness",
-            "--evidence",
-            "user confirmed release readiness",
-            "--project",
-            str(self.tmp),
-        ], stdout=io.StringIO())
+
 
         out = io.StringIO()
         code = self.controller.main([
@@ -923,17 +913,7 @@ LIGHT.
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        self.controller.main([
-            "confirm-stage",
-            "--run-id",
-            "close-run",
-            "--stage",
-            "release_readiness",
-            "--evidence",
-            "user confirmed release readiness",
-            "--project",
-            str(self.tmp),
-        ], stdout=io.StringIO())
+
 
         out = io.StringIO()
         code = self.controller.main([
@@ -1484,16 +1464,17 @@ LIGHT.
         self.assertEqual(self.read_state("confirm-command-run")["current_stage"], "test_design")
         self.assertIn("PASS advanced to test_design", out.getvalue())
 
-    def test_test_review_waiting_confirmation_blocks_development_and_business_writes(self):
+    def test_test_review_pass_auto_advances_to_development_and_allows_business_writes(self):
+        """test_review is no longer a confirmation gate - PASS auto-advances."""
         self.controller.main([
             "init",
-            "Test review needs confirmation",
+            "Test review auto advances",
             "--run-id",
-            "confirm-test-review-run",
+            "auto-test-review-run",
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        state = self.read_state("confirm-test-review-run")
+        state = self.read_state("auto-test-review-run")
         state["current_stage"] = "test_review"
         state["stages"] = {
             "environment_check": "PASS",
@@ -1506,11 +1487,11 @@ LIGHT.
             "solution_review": "PASS",
             "test_design": "PASS",
         }
-        self.write_state("confirm-test-review-run", state)
+        self.write_state("auto-test-review-run", state)
         self.controller.main([
             "record-stage",
             "--run-id",
-            "confirm-test-review-run",
+            "auto-test-review-run",
             "--stage",
             "test_review",
             "--status",
@@ -1521,36 +1502,35 @@ LIGHT.
             str(self.tmp),
         ], stdout=io.StringIO())
 
+        state = self.read_state("auto-test-review-run")
+        self.assertEqual(state["stages"]["test_review"], "PASS")
+
         out = io.StringIO()
         code = self.controller.main([
             "advance",
             "--run-id",
-            "confirm-test-review-run",
+            "auto-test-review-run",
             "--to",
             "development",
             "--project",
             str(self.tmp),
         ], stdout=out)
+        self.assertEqual(code, 0)
 
-        self.assertEqual(code, 1)
-        self.assertIn("test_review is waiting for user confirmation; run confirm-stage --stage test_review", out.getvalue())
-
-        state = self.read_state("confirm-test-review-run")
+        state = self.read_state("auto-test-review-run")
         state["current_stage"] = "development"
-        self.write_state("confirm-test-review-run", state)
+        self.write_state("auto-test-review-run", state)
         out = io.StringIO()
         code = self.controller.main([
             "can-write",
             "--run-id",
-            "confirm-test-review-run",
+            "auto-test-review-run",
             "--kind",
             "business",
             "--project",
             str(self.tmp),
         ], stdout=out)
-
-        self.assertEqual(code, 1)
-        self.assertIn("test_review is waiting for user confirmation; run confirm-stage --stage test_review", out.getvalue())
+        self.assertEqual(code, 0)
 
     def test_code_review_pass_advances_to_test_execution_without_confirmation(self):
         self.controller.main([
@@ -1609,16 +1589,17 @@ LIGHT.
         self.assertEqual(self.read_state("auto-code-review-run")["current_stage"], "test_execution")
         self.assertIn("PASS advanced to test_execution", out.getvalue())
 
-    def test_release_readiness_waits_after_health_gate_before_final_report(self):
+    def test_release_readiness_auto_advances_to_final_report(self):
+        """release_readiness is no longer a confirmation gate - PASS auto-advances."""
         self.controller.main([
             "init",
-            "Release readiness confirms final report adoption",
+            "Release readiness auto advances",
             "--run-id",
-            "confirm-release-run",
+            "auto-release-run",
             "--project",
             str(self.tmp),
         ], stdout=io.StringIO())
-        state = self.read_state("confirm-release-run")
+        state = self.read_state("auto-release-run")
         state["current_stage"] = "release_readiness"
         state["stages"] = {
             "environment_check": "PASS",
@@ -1637,11 +1618,11 @@ LIGHT.
             "test_execution": "PASS",
             "health_gate": "PASS",
         }
-        self.write_state("confirm-release-run", state)
+        self.write_state("auto-release-run", state)
         self.controller.main([
             "record-stage",
             "--run-id",
-            "confirm-release-run",
+            "auto-release-run",
             "--stage",
             "release_readiness",
             "--status",
@@ -1652,42 +1633,17 @@ LIGHT.
             str(self.tmp),
         ], stdout=io.StringIO())
 
+        state = self.read_state("auto-release-run")
+        self.assertEqual(state["stages"]["release_readiness"], "PASS")
+
         out = io.StringIO()
         code = self.controller.main([
             "next",
-            "confirm-release-run",
+            "auto-release-run",
             "--project",
             str(self.tmp),
         ], stdout=out)
-
-        self.assertEqual(code, 1)
-        self.assertIn("release_readiness is waiting for user confirmation; run confirm-stage --stage release_readiness", out.getvalue())
-
-        out = io.StringIO()
-        code = self.controller.main([
-            "confirm-stage",
-            "--run-id",
-            "confirm-release-run",
-            "--stage",
-            "release_readiness",
-            "--evidence",
-            "user adopted test report",
-            "--project",
-            str(self.tmp),
-        ], stdout=out)
-
         self.assertEqual(code, 0)
-        out = io.StringIO()
-        code = self.controller.main([
-            "next",
-            "confirm-release-run",
-            "--project",
-            str(self.tmp),
-        ], stdout=out)
-
-        self.assertEqual(code, 0)
-        self.assertEqual(self.read_state("confirm-release-run")["current_stage"], "final_report")
-        self.assertIn("PASS advanced to final_report", out.getvalue())
 
     def test_strict_validate_rejects_confirmed_gate_without_confirmation_metadata(self):
         self.controller.main([

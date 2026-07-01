@@ -95,6 +95,4 @@ STAGE_DISPLAY_NAMES = {
 CONFIRMATION_GATE_STAGES = {
     "requirement_interview": "spec_draft",
     "solution_review": "test_design",
-    "test_review": "development",
-    "release_readiness": "final_report",
 }

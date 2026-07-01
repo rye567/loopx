@@ -14,7 +14,7 @@
 4. 同一阶段最多自动返工 2 次，第 3 次仍失败则 `BLOCKED`。
 5. 方案设计和方案审核必须给出影响范围。
 6. 测试用例必须包含业务/API 数据准备、执行入口、断言、清理动作和清理验证。
-7. 开发阶段默认 auto：满足写入门禁后，可直接修改受影响代码/测试/阶段文档，并运行编译、单元测试和定向测试。
+7. 开发阶段默认 auto：满足写入门禁后，可直接修改受影响代码、测试和阶段文档，并运行编译、单元测试和定向测试。
 8. auto 不跳过 sandbox、permissions、hooks 或高风险审批。
 9. 高风险动作仍需确认：git commit/push、强推、清库、无 WHERE 删除、生产/联调写入、越权目录写入、破坏性删除、真实外部系统调用。
 10. 当前处于 LoopX 验证期：审核或验证阶段即使状态为 `PASS`，也必须暂停并请求用户确认后才能进入下一阶段。
@@ -25,7 +25,7 @@
 
 ## 写入硬门禁
 
-- 阶段文档和分析文档可以在对应阶段写入；业务代码、测试、配置、SQL、迁移脚本和自动修复属于开发写入。
+- 阶段文档和分析文档可以在对应阶段写入，统一写入项目根目录下的 `docs/loopx/<date>-<slug>/`；`.loopx/runs/<run_id>/` 只用于 controller 状态、worklist、events、stage-results 和自动生成 artifact。
 - 未声明执行深度前，不得进行开发写入。
 - `STANDARD` 和 `FULL` 未通过方案审核，不得进入开发；未通过测试用例审核，不得进入开发。
 - `STANDARD` 和 `FULL` 只有到 `10. 开发` 且上游门禁满足时，才允许开发写入。
@@ -39,10 +39,8 @@
 
 - 需求采访必须先向用户输出问题，收集回答并更新 `interview.md`；未回答时不得记录 `PASS`。
 - 方案审核通过后，确认是否进入测试用例设计。
-- 测试用例审核通过后，确认是否进入开发阶段。
-- 测试执行通过后，先执行 `/health`，再确认是否结束并采纳测试报告。
 
-控制器层面使用中间状态强制表达该门禁：agent 在 `requirement_interview`、`solution_review`、`test_review` 或 `release_readiness` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。代码审查 `PASS` 后不需要人工确认，可继续进入测试执行。需求采访确认是生成 Spec 的前置门：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。最终采纳确认落在 `release_readiness`：`test_execution PASS -> health_gate PASS -> release_readiness NEED_HUMAN -> confirm-stage -> release_readiness PASS -> final_report`。
+控制器层面使用中间状态强制表达该门禁：agent 在 `requirement_interview` 或 `solution_review` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。代码审查、测试审核和发布就绪 `PASS` 后不需要人工确认，可继续进入下一阶段。需求采访确认是生成 Spec 的前置门：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。
 
 如果用户明确说“本次全自动”“跳过人工确认”或“恢复自动推进”，才可以取消本次确认门。高风险动作仍必须单独确认。
 
@@ -108,14 +106,14 @@ stage_result:
 | 5 执行等级选择 | 6 方案设计 | 5 执行等级选择 | 等用户确认执行等级或 accepted risk |
 | 6 方案设计 | 7 方案审核 | 6 方案设计 | 等用户决策 |
 | 7 方案审核 | NEED_HUMAN，`confirm-stage` 后到 8 | 6 方案设计 | 等用户处理 |
-| 8 测试用例设计 | 9 测试用例审核 | 8 测试用例设计 | 等用户处理 |
-| 9 测试用例审核 | NEED_HUMAN，`confirm-stage` 后到 10 | 8 测试用例设计 | 等用户处理 |
+| 8 测试用例设计 | 9 测试用例审核 | 8 测试用例设计 | 等用户补充用例 |
+| 9 测试用例审核 | 10 开发 | 8 测试用例设计 | 等用户处理 |
 | 10 开发 | 11 通用质量审计 | 10 开发 | 等用户处理 |
 | 11 通用质量审计 | 12 代码审查 | 6/8/10，按失败原因选择 | 等用户处理 |
 | 12 代码审查 | 13 测试执行 | 10 开发 | 等用户处理 |
 | 13 测试执行 | 14 健康门 | 8/10，按失败原因选择 | 等用户处理 |
 | 14 健康门 | 15 发布就绪 | 对应责任阶段 | 等用户处理 |
-| 15 发布就绪 | NEED_HUMAN，`confirm-stage` 后到 16 | 对应责任阶段 | 等用户处理 |
+| 15 发布就绪 | 16 最终报告 | 对应责任阶段 | 等用户处理 |
 | 16 最终报告 | 完成 | 对应责任阶段 | 等用户处理 |
 
 审核失败反馈规则：
@@ -178,7 +176,7 @@ python tools/loopx_controller.py can-write --kind business
 
 控制器的最小状态目录为 `.loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl` 和 `stage-results/`。`init` 会自动写入 `stage-results/00-environment-check.json` 并把当前阶段推进到 `requirement_intake`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
 
-`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 和 `test_review` 都必须已确认通过。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
+`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 必须已确认通过。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
 
 ## 本地执行硬约束
 

@@ -41,6 +41,7 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertIn("close-repair", text)
         self.assertIn("confirm-stage --stage requirement_interview", text)
         self.assertIn("can-write --kind business", text)
+        self.assertIn("docs/loopx/<date>-<slug>/", text)
         self.assertIn("`validate PASS` 只代表结构合法", text)
         self.assertIn("返工任务", text)
 
@@ -136,6 +137,12 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertNotIn("loopx init", workflow)
         self.assertNotIn("loopx status", workflow)
         self.assertNotIn("loopx validate", workflow)
+
+    def test_workflow_requires_project_docs_loopx_stage_document_directory(self):
+        workflow = (LOOPX / "workflow.md").read_text(encoding="utf-8")
+
+        self.assertIn("docs/loopx/<date>-<slug>/", workflow)
+        self.assertIn(".loopx/runs/<run_id>/", workflow)
 
     def test_controller_entrypoint_is_thin_facade(self):
         entrypoint = LOOPX / "tools" / "loopx_controller.py"
