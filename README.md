@@ -85,6 +85,10 @@ Codex: $loopx handle this requirement: ...
 Claude Code: /loopx handle this requirement: ...
 ```
 
+See [`docs/demo.md`](docs/demo.md) for a copy-paste end-to-end demo — a full
+LIGHT-mode run from `init` to `close` in ~20 commands. Or read
+[`docs/why-loopx.md`](docs/why-loopx.md) for the background and design rationale.
+
 For project-local reminders, add a short note to your project docs:
 
 ```text
