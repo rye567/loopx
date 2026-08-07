@@ -1,4 +1,4 @@
-# LoopX Kit
+# LoopX
 
 AI 编程 Agent 的阶段化工程工作流。
 
@@ -10,7 +10,7 @@ LoopX 是一个用 Git 维护的 Codex / Claude Code 通用 skill 包。它把 A
 
 ## 为什么需要 LoopX
 
-AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆造验收标准、没有证据就标记评审通过，或者在方案和测试还没确认前直接改业务逻辑。LoopX 提供本地控制器和阶段化工作流，让每个重要变更在进入代码前都留下可检查的产物。
+AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆造验收标准、没有证据就标记评审通过，或者在需求采访和方案审核还没确认前直接改业务逻辑。LoopX 提供本地控制器和阶段化工作流，让每个重要变更在进入代码前都留下可检查的产物。
 
 | 没有 LoopX | 使用 LoopX |
 | --- | --- |
@@ -40,15 +40,15 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
   -> 发布准备
 ```
 
-完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。控制器会把每次运行持久化到 `docs/loopx/runs/<run_id>/`，仅存 controller 状态、worklist、events、stage-results 和自动生成 artifact。LoopX 也可以在收口前记录 Compound Capture 决策：无复用价值时 skipped，有价值且显式允许时 captured 到 `docs/loopx/solutions/<category>/<slug>.md`。
+完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。控制器会把每次运行持久化到 `docs/loopx/runs/<run_id>/`，仅存 controller 状态、worklist、events、stage-results 和自动生成 artifact；收口时中间状态（events、repair-tickets）归档到 `artifacts/archive/`，整个目录不进版本库。LoopX 也可以在收口前记录 Compound Capture 决策：无复用价值时 skipped，有价值且显式允许时 captured 到 `docs/loopx/solutions/<category>/<slug>.md`。
 
 ## 安装
 
 克隆仓库：
 
 ```bash
-git clone git@github.com:rye567/loopx-kit.git
-cd loopx-kit
+git clone git@github.com:rye567/loopx.git
+cd loopx
 ```
 
 把 [`loopx/`](loopx/) 目录复制或链接到目标工具的 skills 目录，并保留目录名为 `loopx`。
@@ -61,12 +61,12 @@ Windows PowerShell：
 # Codex
 New-Item -ItemType Junction `
   -Path "$HOME\.codex\skills\loopx" `
-  -Target "E:\workspace\loopx-kit\loopx"
+  -Target "E:\workspace\loopx\loopx"
 
 # Claude Code
 New-Item -ItemType Junction `
   -Path "$HOME\.claude\skills\loopx" `
-  -Target "E:\workspace\loopx-kit\loopx"
+  -Target "E:\workspace\loopx\loopx"
 ```
 
 Unix-like 系统：

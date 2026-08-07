@@ -1,6 +1,6 @@
-# LoopX Kit v0.1.0 Release Notes
+# LoopX v0.1.0 Release Notes
 
-LoopX Kit v0.1.0 is the first public release of the cross-tool quality gate skill package for Codex and Claude Code.
+LoopX v0.1.0 is the first public release of the cross-tool quality gate skill package for Codex and Claude Code.
 
 ## Highlights
 
@@ -15,8 +15,8 @@ LoopX Kit v0.1.0 is the first public release of the cross-tool quality gate skil
 ## Install
 
 ```bash
-git clone git@github.com:rye567/loopx-kit.git
-cd loopx-kit
+git clone git@github.com:rye567/loopx.git
+cd loopx
 ```
 
 Link or copy `loopx/` into your tool skills directory as `loopx`.
@@ -30,7 +30,7 @@ It is a Codex / Claude Code skill package that forces risky AI coding work throu
 
 Useful when agents touch API contracts, permissions, tenant boundaries, state machines, SQL/MQ flows, or cross-module changes.
 
-Repo: https://github.com/rye567/loopx-kit
+Repo: https://github.com/rye567/loopx
 ```
 
 ## Suggested GitHub Topics

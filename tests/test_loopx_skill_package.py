@@ -49,6 +49,23 @@ class LoopxSkillPackageTest(unittest.TestCase):
         for phrase in ("质量门", "门禁", "闸门"):
             self.assertNotIn(phrase, text)
 
+    def test_confirmation_docs_match_the_two_stage_contract(self):
+        test_review = (LOOPX / "templates" / "05-test-review.md").read_text(encoding="utf-8")
+        release_readiness = (LOOPX / "templates" / "11-release-readiness.md").read_text(encoding="utf-8")
+        agent_docs = {
+            name: (LOOPX / "agents" / name).read_text(encoding="utf-8")
+            for name in ("test-reviewer.md", "code-reviewer.md", "test-runner.md")
+        }
+
+        for text in (test_review, release_readiness):
+            self.assertNotIn("NEED_HUMAN", text)
+            self.assertNotIn("confirm-stage", text)
+            self.assertIn("user_confirmation_required: false", text)
+
+        for text in agent_docs.values():
+            self.assertIn("自动进入", text)
+            self.assertNotIn("等待用户确认", text)
+
     def test_skill_references_existing_resources(self):
         text = (LOOPX / "SKILL.md").read_text(encoding="utf-8")
         expected_resources = [

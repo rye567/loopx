@@ -17,7 +17,7 @@
 - `schemas/`：运行状态、worklist、阶段结果、health、interview、spec、mode、tracking、compound learning 契约。
 - `health.yml`、`risk.yml`、`project-profiles.yml`：策略配置。
 - `tools/loopx_controller.py`：本地状态控制器。
-- `docs/loopx/runs/<run_id>/`：controller 状态、worklist、events、stage-results 和自动生成 artifact。
+- `docs/loopx/runs/<run_id>/`：controller 状态、worklist、events、stage-results 和自动生成 artifact；收口时中间状态（events、repair-tickets）归档到 `artifacts/archive/`，该目录不进版本库。
 - `docs/loopx/solutions/<category>/<slug>.md`：显式允许后写入的长期复用学习。
 
 ## 状态控制器

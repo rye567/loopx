@@ -9,7 +9,7 @@ LoopX 是 Codex 和 Claude Code 可共用的阶段化工程工作流。`loopx/` 
 
 ## 不可跳过规则
 
-1. 先初始化状态机，不手工猜执行深度；环境检查由 controller 在 `init` 时自动执行并记录为 `PASS`：
+1. 先初始化状态机，不手工猜执行深度；仅当本次运行显式激活兼容 Provider 且需要从外部引用加载需求时，先执行通用 `before_init` Hook。环境检查由 controller 在 `init` 时自动执行并记录为 `PASS`：
 ```bash
 python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-tags tenant_scope core_state_transition api_contract
 python loopx/tools/loopx_controller.py status --tracking
@@ -22,7 +22,7 @@ python loopx/tools/loopx_controller.py status --tracking
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-5. 阶段文档和分析文档写入 `docs/loopx/<date>-<slug>/`；`docs/loopx/runs/<run_id>/` 只存 controller 状态、worklist、events、stage-results 和自动生成 artifact。
+5. 阶段文档和分析文档写入 `docs/loopx/<date>-<slug>/`；`docs/loopx/runs/<run_id>/` 只存 controller 状态、worklist、events、stage-results 和自动生成 artifact，收口时中间状态（events、repair-tickets）自动归档到 `artifacts/archive/`。
 6. Review 不通过或用户指出问题时，必须创建返工任务并回到 owner 阶段：
 
 ```bash
@@ -32,7 +32,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 ```
 
 7. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行还需要阶段 `PASS`、写入保护检查、health 检查和未覆盖项说明。
-8. 需求采访和方案审核通过后先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage requirement_interview` 或对应阶段才能继续。代码审查、测试审核和发布就绪 `PASS` 后可继续进入下一阶段。
+8. 需求采访和方案审核通过后先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage requirement_interview` 或对应阶段才能继续。代码审查、测试审核和发布就绪 `PASS` 后可继续；可选 Provider 只按 `workflow.md` 的通用契约执行，不得新增阶段或绕过人工门。
 
 ## 入口
 
@@ -52,11 +52,11 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 
 1. 做项目发现：README、构建文件、主配置、源码结构和测试目录。
 2. 准备风险标签，用 `init --mode auto --risk-tags ...` 选择执行深度。
-3. 按 `workflow.md` 阶段顺序推进；需求采访必须先向用户提问并等待回答。
+3. 按 `workflow.md` 阶段顺序推进，并在已激活 Provider 订阅的生命周期事件调用它；需求采访必须先向用户提问并等待回答。
 4. 阶段结束写入 `stage-results/*.json`；需求采访和方案审核需要用户确认。
 5. 进入下一阶段前用 `advance --to ...` 或 `next`；最终用 `gate`、`git-gate`、`compound`、`close` 收口。
 6. 收口前记录 Compound Capture：默认只写 run artifact；用户确认或项目配置允许时才写 `docs/loopx/solutions/<category>/<slug>.md`。
-7. 最终结论区分本地通过、本地阻塞、未覆盖/需 CI 验证。
+7. 最终结论区分本地通过、本地阻塞、未覆盖/需 CI 验证，并单列可选 Provider 状态。
 
 ## 状态控制器
 ```bash

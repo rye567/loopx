@@ -1,4 +1,4 @@
-# LoopX Kit
+# LoopX
 
 Staged workflow checks for AI coding agents.
 
@@ -40,15 +40,15 @@ request
   -> release readiness
 ```
 
-The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `docs/loopx/runs/<run_id>/`, limited to controller state, worklists, events, stage results, and generated artifacts. LoopX can also record a Compound Capture decision before close: skipped when there is no reusable learning, or captured into `docs/loopx/solutions/<category>/<slug>.md` when explicitly enabled.
+The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `docs/loopx/runs/<run_id>/`, limited to controller state, worklists, events, stage results, and generated artifacts; on close, intermediate state files (`events.jsonl`, `repair-tickets/`) are archived into `artifacts/archive/` and the whole directory is git-ignored. LoopX can also record a Compound Capture decision before close: skipped when there is no reusable learning, or captured into `docs/loopx/solutions/<category>/<slug>.md` when explicitly enabled.
 
 ## Install
 
 Clone the repository:
 
 ```bash
-git clone git@github.com:rye567/loopx-kit.git
-cd loopx-kit
+git clone git@github.com:rye567/loopx.git
+cd loopx
 ```
 
 Link or copy the [`loopx/`](loopx/) directory into your tool's skills directory and keep the directory name as `loopx`.
@@ -59,12 +59,12 @@ Recommended live-link setup:
 # Codex
 New-Item -ItemType Junction `
   -Path "$HOME\.codex\skills\loopx" `
-  -Target "E:\workspace\loopx-kit\loopx"
+  -Target "E:\workspace\loopx\loopx"
 
 # Claude Code
 New-Item -ItemType Junction `
   -Path "$HOME\.claude\skills\loopx" `
-  -Target "E:\workspace\loopx-kit\loopx"
+  -Target "E:\workspace\loopx\loopx"
 ```
 
 On Unix-like systems, use a symbolic link:

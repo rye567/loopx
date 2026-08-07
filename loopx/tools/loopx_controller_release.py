@@ -4,7 +4,10 @@
 收口命令只负责汇总证据；是否可以收口必须先通过 validate_run 的统一检查。
 """
 
+import json
+import shutil
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from loopx_controller_contracts import STAGE_RESULT_FILES, STAGE_SEQUENCE
@@ -88,6 +91,49 @@ def build_close_evidence(project, run_id, state):
     }
 
 
+def archive_intermediate_state(directory):
+    """把收口后不再需要的中间状态文件归档，减少机器 JSON 对文档目录的污染。
+
+    保留：stage-results/、close-evidence.json、interview/spec 等可读产物。
+    归档：events.jsonl、repair-tickets/ 等仅运行期需要的文件，
+    移到 artifacts/archive/ 下统一存放；归档失败不影响 close 收口。
+    """
+    if not directory.exists():
+        return
+    archive_dir = directory / "artifacts" / "archive"
+    moves = [
+        directory / "events.jsonl",
+        directory / "artifacts" / "repair-tickets",
+    ]
+    moved = []
+    for source in moves:
+        if not source.exists():
+            continue
+        if source.is_dir():
+            target = archive_dir / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                shutil.rmtree(target)
+            source.rename(target)
+        else:
+            target = archive_dir / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                target.unlink()
+            source.rename(target)
+        moved.append(str(target.relative_to(directory)))
+    if moved:
+        # 事件日志先归档再追加，避免在 run 根目录重建 events.jsonl。
+        archive_events = archive_dir / "events.jsonl"
+        if archive_events.exists():
+            with archive_events.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps({
+                    "time": datetime.now().isoformat(timespec="seconds"),
+                    "type": "close_archived",
+                    "archived": moved,
+                }, ensure_ascii=False) + "\n")
+
+
 def cmd_close(args, stdout):
     project = Path(args.project).resolve()
     try:
@@ -124,6 +170,7 @@ def cmd_close(args, stdout):
     except (FileNotFoundError, YamlSubsetError):
         pass
     append_event(get_run_dir(project, run_id), {"type": "run_closed", "run_id": run_id})
+    archive_intermediate_state(get_run_dir(project, run_id))
     print(f"PASS close {run_id}", file=stdout)
     print("status: PASS", file=stdout)
     return 0

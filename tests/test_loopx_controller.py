@@ -1078,6 +1078,12 @@ decision: captured
         self.assertEqual(evidence["compound_capture"]["decision"], "skipped")
         self.assertIn("final_report", evidence["evidence_matrix"])
         self.assertIn("CI/remote verification not covered by local close", evidence["uncovered"])
+        self.assertTrue((run_dir / "artifacts" / "close-evidence.json").exists())
+        self.assertFalse((run_dir / "events.jsonl").exists(), "events.jsonl should be archived after close")
+        self.assertFalse((run_dir / "artifacts" / "repair-tickets").exists(), "repair-tickets should be archived after close")
+        self.assertTrue((run_dir / "artifacts" / "archive" / "events.jsonl").exists())
+        self.assertTrue((run_dir / "artifacts" / "archive" / "repair-tickets").exists())
+        self.assertTrue((run_dir / "stage-results" / "00-environment-check.json").exists(), "stage-results should be preserved after close")
 
     def test_advance_to_solution_design_requires_interview_spec_and_mode_gates(self):
         self.controller.main([

@@ -6,3 +6,5 @@ CLAUDE.md
 .codex/
 .claude/
 .loopx/
+# LoopX 运行状态（机器生成，非人工文档，不进版本库）
+docs/loopx/runs/

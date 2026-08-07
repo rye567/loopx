@@ -1,6 +1,6 @@
 # 05 用例审核
 
-- 状态：NEED_HUMAN（agent 审核通过后等待用户确认）
+- 状态：PASS（审核通过后自动进入开发）
 - 覆盖结论：
 - 缺口：
 - 清理策略审核：
@@ -13,12 +13,12 @@
 ```yaml
 stage_result:
   stage: "05 测试用例审核"
-  status: NEED_HUMAN
+  status: PASS|CHANGES_REQUIRED|BLOCKED|ACCEPTED_RISK
   return_to:
-  next_action: confirm-stage --stage test_review
+  next_action: development
   affected_work_items: []
   evidence: []
-  user_confirmation_required: true
+  user_confirmation_required: false
   blocked_reason:
 ```
 
