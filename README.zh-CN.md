@@ -8,6 +8,21 @@ AI 编程 Agent 的阶段化工程工作流。
 
 [English README](README.md)
 
+![LoopX 演示](docs/assets/loopx-demo.gif)
+
+```mermaid
+flowchart LR
+    A["Init<br/>环境检查"] --> B["需求接收<br/>+需求采访"]
+    B -->|"confirm-stage<br/>人工确认门"| C["规格草稿<br/>+规格评审"]
+    C --> D["等级选择<br/>LIGHT / STANDARD / FULL"]
+    D --> E["方案设计<br/>+方案评审"]
+    E -->|"confirm-stage<br/>人工确认门"| F["测试设计<br/>+测试评审"]
+    F --> G["开发<br/>can-write 在此解锁"]
+    G --> H["质量审计<br/>代码审查<br/>测试执行"]
+    H --> I["健康门<br/>发布就绪"]
+    I --> J["最终报告<br/>gate + close"]
+```
+
 LoopX 是一个用 Git 维护的 Codex / Claude Code 通用 skill 包。它把 AI 编程任务从“收到需求就开始改代码”拉回到可审计的工程流程：需求采访、规格说明、人工确认的方案评审、测试设计、实现、代码评审和发布检查。
 
 当 Agent 要修改跨模块行为、API 契约、权限边界、租户隔离、状态机、SQL/MQ 流程，或者任何“看起来完成了”还不够的变更时，就适合使用 LoopX。

@@ -8,6 +8,21 @@ Staged workflow checks for AI coding agents.
 
 [中文说明](README.zh-CN.md)
 
+![LoopX demo](docs/assets/loopx-demo.gif)
+
+```mermaid
+flowchart LR
+    A["Init<br/>env check"] --> B["Requirement<br/>intake + interview"]
+    B -->|"confirm-stage<br/>human gate"| C["Spec draft<br/>+ review"]
+    C --> D["Mode select<br/>LIGHT / STANDARD / FULL"]
+    D --> E["Solution design<br/>+ review"]
+    E -->|"confirm-stage<br/>human gate"| F["Test design<br/>+ review"]
+    F --> G["Development<br/>can-write unlocks here"]
+    G --> H["Quality audit<br/>code review<br/>test execution"]
+    H --> I["Health gate<br/>release readiness"]
+    I --> J["Final report<br/>gate + close"]
+```
+
 LoopX is a Git-maintained skill package for Codex and Claude Code. It keeps AI coding work from jumping straight into implementation by guiding risky changes through requirement interview, spec drafting, human-confirmed reviews, test planning, implementation, and release checks.
 
 Use it when an agent is about to touch cross-module behavior, API contracts, permissions, tenant boundaries, state machines, SQL/MQ flows, or anything where "looks done" is not good enough.
