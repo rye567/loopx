@@ -1,16 +1,12 @@
 {
   "type": "object",
   "required": [
-    "required",
     "status",
     "artifact",
     "approved",
     "gate_result"
   ],
   "properties": {
-    "required": {
-      "type": "boolean"
-    },
     "status": {
       "type": "string",
       "enum": ["NOT_CREATED", "DRAFT", "APPROVED", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN"]
@@ -23,7 +19,7 @@
     },
     "gate_result": {
       "type": "string",
-      "enum": ["PENDING", "PASS", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN"]
+      "enum": ["PENDING", "PASS", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN", "SKIPPED"]
     },
     "required_sections": {
       "type": "array",

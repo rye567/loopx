@@ -5,7 +5,6 @@
 loopx_controller_flow.py，避免写入规则散在多个文件里。
 """
 
-import json
 import re
 from datetime import datetime
 
@@ -16,20 +15,16 @@ from loopx_controller_contracts import (
     STAGE_SEQUENCE,
 )
 from loopx_controller_io import load_worklist, loopx_root, run_root
-from loopx_controller_yaml import YamlSubsetError, dump_worklist, parse_yaml_subset
+from loopx_controller_yaml import YamlSubsetError, dump_worklist, parse_yaml_subset, yaml_string
 
 
-def slugify(text):
+def slugify(text, max_length=48):
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
-    return slug[:48] or "loopx-run"
+    return slug[:max_length] or "loopx-run"
 
 
 def default_run_id(requirement):
     return f"{datetime.now().strftime('%Y-%m-%d')}-{slugify(requirement)}"
-
-
-def yaml_string(value):
-    return json.dumps(str(value), ensure_ascii=False)
 
 
 def render_worklist(run_id, requirement, mode):
@@ -93,20 +88,16 @@ def mode_rank(mode):
     return {"LIGHT": 1, "STANDARD": 2, "FULL": 3}.get(mode, 0)
 
 
-def interview_state(run_id, mode):
+def interview_state(run_id):
     return {
-        "required": True,
-        "mode": mode,
         "status": "NOT_STARTED",
         "artifact": f"docs/loopx/runs/{run_id}/artifacts/interview.md",
         "unanswered_questions": 0,
-        "can_skip": False,
     }
 
 
 def spec_state(run_id):
     return {
-        "required": True,
         "status": "NOT_CREATED",
         "artifact": f"docs/loopx/runs/{run_id}/artifacts/spec.md",
         "approved": False,
@@ -129,19 +120,8 @@ def mode_decision_state(mode, risk_tags, selected_by):
     }
 
 
-def transition_policy_state():
-    return {
-        "require_interview_before_spec": True,
-        "require_spec_before_design": True,
-        "require_mode_before_design": True,
-        "require_design_review_before_development": True,
-        "require_git_gate_before_final_report": True,
-    }
-
-
 def tracking_state(run_id):
     return {
-        "show_on_every_update": True,
         "worklist": f"docs/loopx/runs/{run_id}/worklist.yml",
     }
 

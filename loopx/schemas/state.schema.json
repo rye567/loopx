@@ -7,7 +7,6 @@
     "status",
     "current_stage",
     "risk_tags",
-    "confirmation_policy",
     "max_auto_repair",
     "worklist",
     "events",
@@ -46,9 +45,6 @@
         "type": "string"
       }
     },
-    "confirmation_policy": {
-      "type": "string"
-    },
     "max_auto_repair": {
       "type": "integer"
     },
@@ -74,9 +70,6 @@
       "type": "object"
     },
     "tracking": {
-      "type": "object"
-    },
-    "transition_policy": {
       "type": "object"
     },
     "git_gate": {

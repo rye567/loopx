@@ -10,7 +10,7 @@ from pathlib import Path
 from loopx_controller_contracts import DEFAULT_STAGE_OWNERS, STAGE_SEQUENCE
 from loopx_controller_flow import record_stage_result, stage_index
 from loopx_controller_io import load_state, load_worklist, save_state
-from loopx_controller_state import resolve_run_id
+from loopx_controller_state import resolve_run_id, update_worklist_state
 from loopx_controller_tickets import (
     open_repair_tickets_for_stage,
     read_repair_ticket,
@@ -40,10 +40,13 @@ def update_worklist_feedback(project, state, item_id, return_to, reason):
 def fail_review(project, run_id, from_stage, return_to, item_id, reasons):
     state = load_state(project, run_id)
     owner = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(return_to, return_to)
-    # 每次返工都递增 attempt，便于报告里区分同一问题的多轮修复。
+    # 按阶段递增返工次数；超过 max_auto_repair 后第 N 次仍失败则 BLOCKED，等待用户处理。
+    # ticket.status 只表达票据生命周期（OPEN/CLOSED），阶段结果记录在 stage 状态里。
     attempts = state.setdefault("loop_attempts", {})
-    attempt = int(attempts.get(item_id, 0)) + 1
-    attempts[item_id] = attempt
+    attempt = int(attempts.get(from_stage, 0)) + 1
+    attempts[from_stage] = attempt
+    limit = int(state.get("max_auto_repair", 2))
+    stage_status = "CHANGES_REQUIRED" if attempt <= limit else "BLOCKED"
     ticket = {
         "type": "review_failed",
         "item": item_id,
@@ -52,6 +55,7 @@ def fail_review(project, run_id, from_stage, return_to, item_id, reasons):
         "assigned_to": owner,
         "attempt": attempt,
         "status": "OPEN",
+        "stage_status": stage_status,
         "required_changes": reasons,
         "artifact": "",
         "revision": 0,
@@ -60,7 +64,7 @@ def fail_review(project, run_id, from_stage, return_to, item_id, reasons):
     state["current_stage"] = return_to
     state["next_action"] = f"repair_{return_to}"
     state["active_agent"] = owner
-    state.setdefault("stages", {})[from_stage] = "CHANGES_REQUIRED"
+    state.setdefault("stages", {})[from_stage] = stage_status
     for later_stage in STAGE_SEQUENCE[stage_index(return_to) + 1:]:
         if later_stage != from_stage:
             state["stages"].pop(later_stage, None)
@@ -72,12 +76,16 @@ def fail_review(project, run_id, from_stage, return_to, item_id, reasons):
         project,
         run_id,
         from_stage,
-        "CHANGES_REQUIRED",
+        stage_status,
         reasons,
         return_to=return_to,
         next_action=f"repair_{return_to}",
         affected_work_items=[item_id],
+        blocked_reason=f"auto repair exceeded max_auto_repair={limit}" if stage_status == "BLOCKED" else "",
     )
+    # record_stage_result 已重新落库 state，这里再同步 worklist 的 stage 状态，避免 strict 校验漂移。
+    state = load_state(project, run_id)
+    update_worklist_state(project, state, from_stage, stage_status)
     return ticket
 
 
@@ -89,7 +97,7 @@ def cmd_fail_review(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    print(f"CHANGES_REQUIRED {args.from_stage}", file=stdout)
+    print(f"{ticket['stage_status']} {args.from_stage}", file=stdout)
     print(f"repair_ticket: {ticket['item']}", file=stdout)
     print(f"return_to: {ticket['return_to']}", file=stdout)
     print(f"assigned_to: {ticket['assigned_to']}", file=stdout)
@@ -147,6 +155,8 @@ def cmd_close_repair(args, stdout):
     from_stage = ticket.get("from_stage")
     if from_stage:
         state.setdefault("stages", {}).pop(from_stage, None)
+        # 返工项关闭后重置该阶段的返工计数，允许重新计数自动返工上限。
+        state.setdefault("loop_attempts", {}).pop(from_stage, None)
     save_state(project, run_id, state)
     print(f"PASS repair closed {args.item}", file=stdout)
     print(f"artifact: {args.artifact}", file=stdout)

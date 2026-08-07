@@ -11,6 +11,7 @@ from loopx_controller_artifacts import interview_has_unanswered_placeholders
 from loopx_controller_contracts import (
     CONFIRMATION_GATE_STAGES,
     DEFAULT_STAGE_OWNERS,
+    MODE_SKIPPABLE_STAGES,
     PASSING_STATUSES,
     STAGES,
     STAGE_RESULT_FILES,
@@ -115,7 +116,7 @@ def build_stage_result(state, stage, agent_result, stored_status, return_to, nex
 
 
 def validate_requirement_interview_pass(project, run_id, state):
-    interview = state.setdefault("interview", interview_state(run_id, state.get("mode", "")))
+    interview = state.setdefault("interview", interview_state(run_id))
     artifact = project_path(project, interview.get("artifact"))
     if not artifact.exists():
         raise ValueError(f"requirement_interview cannot PASS before interview artifact exists: {interview.get('artifact')}")
@@ -132,7 +133,7 @@ def validate_requirement_interview_pass(project, run_id, state):
 def apply_stage_metadata(state, run_id, stage, status, stored_status=None):
     effective_status = stored_status or status
     if stage == "requirement_interview":
-        state.setdefault("interview", interview_state(run_id, state.get("mode", "")))["status"] = effective_status
+        state.setdefault("interview", interview_state(run_id))["status"] = effective_status
     if stage == "spec_review":
         spec = state.setdefault("spec", spec_state(run_id))
         spec["gate_result"] = effective_status
@@ -195,6 +196,10 @@ def record_stage_result(project, run_id, stage, status, evidence, return_to="", 
     return result
 
 
+def stage_can_be_skipped(stage, state):
+    return stage in MODE_SKIPPABLE_STAGES.get(state.get("mode", ""), frozenset())
+
+
 def advance_blockers(project, run_id, state, target_stage):
     blockers = []
     stages = state.get("stages", {})
@@ -206,25 +211,15 @@ def advance_blockers(project, run_id, state, target_stage):
     if changed:
         blockers.append(f"{changed} is {stages[changed]}; return before advancing")
     for stage in stages_before(target_stage):
-        if is_waiting_confirmation(stage, stages.get(stage)):
+        status = stages.get(stage)
+        if is_waiting_confirmation(stage, status):
             blockers.append(pending_confirmation_message(stage))
             continue
-        if stages.get(stage) not in PASSING_STATUSES:
-            blockers.append(f"{stage} must be PASS before {target_stage}")
-    if target_stage == "spec_draft" and stages.get("requirement_interview") not in PASSING_STATUSES:
-        blockers.append("requirement_interview must be PASS before spec_draft")
-    if target_stage == "solution_design":
-        for stage in ("requirement_interview", "spec_review", "mode_selection"):
-            if stages.get(stage) not in PASSING_STATUSES:
-                message = f"{stage} must be PASS before solution_design"
-                if message not in blockers:
-                    blockers.append(message)
-    if (
-        target_stage == "development"
-        and not is_waiting_confirmation("solution_review", stages.get("solution_review"))
-        and stages.get("solution_review") not in PASSING_STATUSES
-    ):
-        blockers.append("solution_review must be PASS before development")
+        if status in PASSING_STATUSES:
+            continue
+        if status == "SKIPPED" and stage_can_be_skipped(stage, state):
+            continue
+        blockers.append(f"{stage} must be PASS before {target_stage}")
     return blockers
 
 
@@ -234,9 +229,12 @@ def business_write_blockers(state):
         blockers.append("current_stage must be development")
     stages = state.get("stages", {})
     for stage in ("solution_review", "test_review"):
-        if is_waiting_confirmation(stage, stages.get(stage)):
+        status = stages.get(stage)
+        if is_waiting_confirmation(stage, status):
             blockers.append(pending_confirmation_message(stage))
-        elif stages.get(stage) not in PASSING_STATUSES:
+        elif status not in PASSING_STATUSES and not (
+            status == "SKIPPED" and stage_can_be_skipped(stage, state)
+        ):
             blockers.append(f"{stage} must be PASS before business writes")
     changed = first_changes_required(stages)
     if changed:
@@ -279,7 +277,7 @@ def confirm_stage(project, run_id, stage, evidence, confirmed_by):
     state.setdefault("stages", {})[stage] = "PASS"
     state.setdefault("confirmations", {})[stage] = confirmation
     if stage == "requirement_interview":
-        state.setdefault("interview", interview_state(run_id, state.get("mode", "")))["status"] = "PASS"
+        state.setdefault("interview", interview_state(run_id))["status"] = "PASS"
     state["next_action"] = CONFIRMATION_GATE_STAGES[stage]
     apply_confirmation_result(result, state, stage, confirmation)
     write_json(result_path, result)

@@ -34,6 +34,7 @@ from loopx_controller_flow import (
     is_waiting_confirmation,
     pending_confirmation_message,
     record_stage_result,
+    stage_can_be_skipped,
     stage_result_path,
 )
 from loopx_controller_io import (
@@ -64,7 +65,6 @@ from loopx_controller_state import (
     resolve_run_id,
     spec_state,
     tracking_state,
-    transition_policy_state,
     update_worklist_state,
 )
 from loopx_controller_validation import strict_validation_errors, validate_run
@@ -128,18 +128,16 @@ def cmd_init(args, stdout):
         "active_agent": DEFAULT_STAGE_OWNERS["environment_check"],
         "stage_owners": DEFAULT_STAGE_OWNERS,
         "risk_tags": risk_tags,
-        "confirmation_policy": "verification_gated",
         "max_auto_repair": 2,
         "worklist": f"docs/loopx/runs/{run_id}/worklist.yml",
         "events": f"docs/loopx/runs/{run_id}/events.jsonl",
         "repair_tickets": f"docs/loopx/runs/{run_id}/artifacts/repair-tickets",
         "loop_attempts": {},
         "stages": {},
-        "interview": interview_state(run_id, mode),
+        "interview": interview_state(run_id),
         "spec": spec_state(run_id),
         "mode_decision": mode_decision_state(mode, risk_tags, "auto" if args.mode == "auto" else "user"),
         "tracking": tracking_state(run_id),
-        "transition_policy": transition_policy_state(),
         "git_gate": {
             "status": "PENDING",
             "diff_summary": "",
@@ -223,7 +221,7 @@ def cmd_interview(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    artifact = project_path(project, state.setdefault("interview", interview_state(run_id, state.get("mode", ""))).get("artifact"))
+    artifact = project_path(project, state.setdefault("interview", interview_state(run_id)).get("artifact"))
     artifact.parent.mkdir(parents=True, exist_ok=True)
     artifact.write_text(render_interview_artifact(state), encoding="utf-8")
     questions = interview_questions(state)
@@ -263,7 +261,7 @@ def cmd_spec(args, stdout):
         print("FAIL spec blocked", file=stdout)
         print("- requirement_interview must be PASS before spec_draft", file=stdout)
         return 1
-    interview_artifact = project_path(project, state.setdefault("interview", interview_state(run_id, state.get("mode", ""))).get("artifact"))
+    interview_artifact = project_path(project, state.setdefault("interview", interview_state(run_id)).get("artifact"))
     if not interview_artifact.exists():
         print("FAIL spec blocked", file=stdout)
         print(f"- interview artifact is missing: {state['interview']['artifact']}", file=stdout)
@@ -299,7 +297,10 @@ def cmd_mode(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    if state.get("stages", {}).get("spec_review") not in PASSING_STATUSES:
+    spec_review_status = state.get("stages", {}).get("spec_review")
+    if spec_review_status not in PASSING_STATUSES and not (
+        spec_review_status == "SKIPPED" and stage_can_be_skipped("spec_review", state)
+    ):
         print("FAIL mode blocked", file=stdout)
         print("- spec_review must be PASS before mode_selection", file=stdout)
         return 1
@@ -345,10 +346,13 @@ def cmd_next(args, stdout):
     if current not in STAGES:
         print(f"FAIL current_stage is not known: {current}", file=stdout)
         return 1
-    target = default_next_stage(current)
+    return advance_to_stage(project, run_id, state, default_next_stage(current), stdout, fail_banner="FAIL next blocked")
+
+
+def advance_to_stage(project, run_id, state, target, stdout, fail_banner="FAIL advance blocked"):
     blockers = advance_blockers(project, run_id, state, target)
     if blockers:
-        print("FAIL next blocked", file=stdout)
+        print(fail_banner, file=stdout)
         for blocker in blockers:
             print(f"- {blocker}", file=stdout)
         return 1
@@ -395,19 +399,7 @@ def cmd_advance(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    blockers = advance_blockers(project, run_id, state, args.to)
-    if blockers:
-        print("FAIL advance blocked", file=stdout)
-        for blocker in blockers:
-            print(f"- {blocker}", file=stdout)
-        return 1
-    state["current_stage"] = args.to
-    state["active_agent"] = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(args.to, args.to)
-    state["next_action"] = default_next_stage(args.to)
-    save_state(project, run_id, state)
-    append_event(get_run_dir(project, run_id), {"type": "advanced", "to": args.to})
-    print(f"PASS advanced to {args.to}", file=stdout)
-    return 0
+    return advance_to_stage(project, run_id, state, args.to, stdout)
 
 
 def cmd_can_write(args, stdout):

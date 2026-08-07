@@ -16,12 +16,13 @@ from loopx_controller_compound import validate_compound_capture
 from loopx_controller_contracts import (
     CONFIRMATION_GATE_STAGES,
     FULL_REQUIRED_PASS_STAGES,
+    MODE_SKIPPABLE_STAGES,
     PASSING_STATUSES,
     STAGES,
     STAGE_SEQUENCE,
     STAGE_STATUSES,
 )
-from loopx_controller_flow import stage_result_path
+from loopx_controller_flow import stage_can_be_skipped, stage_result_path
 from loopx_controller_io import (
     get_run_dir,
     load_schema,
@@ -34,7 +35,7 @@ from loopx_controller_yaml import YamlSubsetError, parse_yaml_subset
 
 def strict_validation_errors(project, run_id, state, worklist):
     errors = []
-    for key in ("interview", "spec", "mode_decision", "tracking", "transition_policy", "git_gate"):
+    for key in ("interview", "spec", "mode_decision", "tracking", "git_gate"):
         if key not in state or state[key] is None:
             errors.append(f"state.{key} is required for strict validation")
     if errors:
@@ -58,13 +59,17 @@ def strict_validation_errors(project, run_id, state, worklist):
         accepted = mode_decision.get("accepted_risk", {})
         if not accepted.get("selected_lower_than_recommended") or not accepted.get("reason"):
             errors.append("state.mode_decision.accepted_risk.reason is required when selected mode is lower than recommended")
-    if state.get("mode") == "FULL" or mode_decision.get("selected") == "FULL":
-        for stage in ("solution_review", "test_review", "health_gate", "release_readiness"):
-            if state.get("stages", {}).get(stage) == "SKIPPED":
-                errors.append(f"FULL mode cannot skip {stage}")
+    # SKIPPED 只能出现在该模式允许跳过的阶段（MODE_SKIPPABLE_STAGES 为唯一事实源）。
+    skippable = MODE_SKIPPABLE_STAGES.get(state.get("mode", ""), frozenset())
+    for stage, status in state.get("stages", {}).items():
+        if status == "SKIPPED" and stage not in skippable:
+            errors.append(f"{stage} cannot be SKIPPED in {state.get('mode')} mode")
     if state.get("stages", {}).get("final_report") == "PASS":
         # final_report 是收口入口，必须同时有发布准备、Git 摘要和复利沉淀决策。
-        if state.get("stages", {}).get("release_readiness") not in PASSING_STATUSES:
+        release_status = state.get("stages", {}).get("release_readiness")
+        if release_status not in PASSING_STATUSES and not (
+            release_status == "SKIPPED" and stage_can_be_skipped("release_readiness", state)
+        ):
             errors.append("release_readiness must be PASS before final_report PASS")
         git_gate = state.get("git_gate", {})
         if git_gate.get("status") != "PASS":

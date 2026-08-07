@@ -17,7 +17,7 @@
 7. 开发阶段默认 auto：满足写入条件后，可直接修改受影响代码、测试和阶段文档，并运行编译、单元测试和定向测试。
 8. auto 不跳过 sandbox、permissions、hooks 或高风险审批。
 9. 高风险动作仍需确认：git commit/push、强推、清库、无 WHERE 删除、生产/联调写入、越权目录写入、破坏性删除、真实外部系统调用。
-10. 当前处于 LoopX 验证期：只有需求采访和方案审核 `PASS` 后必须暂停并请求用户确认；代码审查、测试审核、测试执行、健康门和发布就绪 `PASS` 后不需要人工确认。
+10. 当前处于 LoopX 验证期：只有需求采访和方案审核 `PASS` 后必须暂停并请求用户确认；其余阶段 `PASS` 后不需要人工确认。
 11. 本地 `PASS` 只代表本地验证通过；没有接入 PR/CI 时，最终报告必须显式写出“CI/远端未覆盖”。
 12. 整个 LoopX 流程完成前必须执行 `/health`；未执行、失败或无法运行时，不得宣称最终完整通过。
 13. `/health` 不强依赖三方插件；核心健康检查必须在零插件环境下可运行，三方工具只能作为增强检查。
@@ -106,7 +106,7 @@ Provider 结果写入 `docs/loopx/runs/<run_id>/artifacts/integrations/<provider
 - 需求采访必须先向用户输出问题，收集回答并更新 `interview.md`；未回答时不得记录 `PASS`。
 - 方案审核通过后，确认是否进入测试用例设计。
 
-控制器层面使用中间状态表达人工确认：agent 在 `requirement_interview` 或 `solution_review` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。代码审查、测试审核和发布就绪 `PASS` 后不需要人工确认，可继续进入下一阶段。需求采访确认是生成 Spec 的前置条件：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。
+控制器层面使用中间状态表达人工确认：agent 在 `requirement_interview` 或 `solution_review` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。需求采访确认是生成 Spec 的前置条件：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。
 
 如果用户明确说“本次全自动”“跳过人工确认”或“恢复自动推进”，才可以取消本次确认门。高风险动作仍必须单独确认。
 
@@ -158,7 +158,9 @@ stage_result:
   blocked_reason:
 ```
 
-每个非 `PASS` 结果必须包含失败原因、影响范围、证据、`return_to` 目标阶段、需要修正的 worklist item 和是否需要用户确认。Agent 不得只写“未通过”而不写下一步去向。
+每个非 `PASS` 结果必须包含失败原因、影响范围、证据、`return_to` 目标阶段、需要修正的 worklist item 和是否需要用户确认。Agent 不得只写”未通过”而不写下一步去向。
+
+合法 SKIPPED：只有 `MODE_SKIPPABLE_STAGES`（`loopx/tools/loopx_controller_contracts.py`，唯一事实源）中当前模式允许的阶段，`record-stage --status SKIPPED` 后才能继续推进；不允许的阶段 SKIPPED 会被 `advance` 和 `validate --strict` 拒绝。LIGHT 允许跳过审核/审计门（`spec_review`、`solution_design`、`solution_review`、`test_design`、`test_review`、`quality_audit`、`release_readiness`）；STANDARD/FULL 不允许跳过任何阶段。
 
 合法推进：
 
@@ -245,7 +247,13 @@ python tools/loopx_controller.py can-write --kind business
 
 控制器的最小状态目录为 `docs/loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `artifacts/`。`init` 会自动写入 `stage-results/00-environment-check.json` 并把当前阶段推进到 `requirement_intake`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
 
-`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。收口前必须用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，并在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`，记录阶段证据矩阵、Git Gate、CI/远端未覆盖项；并把运行期中间文件（`events.jsonl`、`artifacts/repair-tickets/`）自动归档到 `artifacts/archive/`，`stage-results/`、`close-evidence.json`、interview/spec 等可读产物保留在原地。`docs/loopx/runs/` 是机器生成状态目录，已加入 `.gitignore`，不应提交进版本库。业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 必须已确认通过。Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
+`validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。
+
+收口流程：先用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`（阶段证据矩阵、Git Gate、CI/远端未覆盖项），并把运行期中间文件（`events.jsonl`、`artifacts/repair-tickets/`）自动归档到 `artifacts/archive/`；`stage-results/`、`close-evidence.json`、interview/spec 等可读产物保留在原地。`docs/loopx/runs/` 是机器生成状态目录，已加入 `.gitignore`，不应提交进版本库。
+
+业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 必须已确认通过。
+
+Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
 
 Compound Capture 是收口辅助能力，不作为正式阶段插入状态机。每次收口前应记录 captured 或 skipped 决策，默认写入 `docs/loopx/runs/<run_id>/artifacts/compound-capture.md`。只有用户确认或项目配置允许时，才写入长期知识库 `docs/loopx/solutions/<category>/<slug>.md`；不得自动修改用户项目的 `AGENTS.md` 或 `CLAUDE.md`。
 

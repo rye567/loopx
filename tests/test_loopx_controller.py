@@ -158,7 +158,7 @@ class LoopxControllerTest(unittest.TestCase):
         self.assertEqual(state["mode_decision"]["selected"], "")
         self.assertEqual(state["mode_decision"]["selection_status"], "NEED_HUMAN")
         self.assertEqual(state["mode_decision"]["selected_by"], "auto")
-        self.assertTrue(state["transition_policy"]["require_interview_before_spec"])
+        self.assertEqual(state["interview"]["status"], "NOT_STARTED")
         self.assertIn("spec:", worklist)
         self.assertIn("interview:", worklist)
         self.assertIn("stages:", worklist)
@@ -220,7 +220,6 @@ class LoopxControllerTest(unittest.TestCase):
             "mode": "STANDARD",
             "status": "ACTIVE",
             "current_stage": "environment_check",
-            "confirmation_policy": "verification_gated",
             "max_auto_repair": 2,
             "worklist": "docs/loopx/runs/bad-run/worklist.yml",
             "events": "docs/loopx/runs/bad-run/events.jsonl",
@@ -367,7 +366,7 @@ items:
         run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-schema-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         del state["interview"]["artifact"]
-        state["tracking"]["show_on_every_update"] = "yes"
+        state["tracking"]["worklist"] = 123
         (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
 
         out = io.StringIO()
@@ -381,7 +380,7 @@ items:
 
         self.assertEqual(code, 1)
         self.assertIn("state.interview.artifact is required", out.getvalue())
-        self.assertIn("state.tracking.show_on_every_update must be boolean", out.getvalue())
+        self.assertIn("state.tracking.worklist must be string", out.getvalue())
 
     def test_gate_command_runs_strict_validation(self):
         self.controller.main([
@@ -478,9 +477,9 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("FULL mode cannot skip solution_review", out.getvalue())
-        self.assertIn("FULL mode cannot skip test_review", out.getvalue())
-        self.assertIn("FULL mode cannot skip health_gate", out.getvalue())
+        self.assertIn("solution_review cannot be SKIPPED in FULL mode", out.getvalue())
+        self.assertIn("test_review cannot be SKIPPED in FULL mode", out.getvalue())
+        self.assertIn("health_gate cannot be SKIPPED in FULL mode", out.getvalue())
 
     def test_strict_validate_rejects_interview_pass_with_unanswered_questions(self):
         self.controller.main([
@@ -1118,6 +1117,439 @@ decision: captured
         self.assertIn("requirement_interview must be PASS before solution_design", text)
         self.assertIn("spec_review must be PASS before solution_design", text)
         self.assertIn("mode_selection must be PASS before solution_design", text)
+
+    def test_light_skipped_stage_allows_advance_and_syncs_worklist(self):
+        self.controller.main([
+            "init",
+            "Light skip gate",
+            "--run-id",
+            "light-skip-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "light-skip-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "SKIPPED",
+            "mode_selection": "PASS",
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "light-skip-run",
+            "--to",
+            "solution_design",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0, out.getvalue())
+        self.assertIn("PASS advanced to solution_design", out.getvalue())
+        worklist_text = (run_dir / "worklist.yml").read_text(encoding="utf-8")
+        self.assertIn("current_stage: solution_design", worklist_text)
+
+    def test_skipped_stage_blocks_advance_outside_allowed_mode(self):
+        self.controller.main([
+            "init",
+            "Standard skip gate",
+            "--run-id",
+            "standard-skip-run",
+            "--mode",
+            "STANDARD",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "standard-skip-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "SKIPPED",
+            "mode_selection": "PASS",
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "standard-skip-run",
+            "--to",
+            "solution_design",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("spec_review must be PASS before solution_design", out.getvalue())
+
+    def test_light_cannot_skip_hard_required_stage(self):
+        self.controller.main([
+            "init",
+            "Light hard stage",
+            "--run-id",
+            "light-hard-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "light-hard-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "SKIPPED",
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "light-hard-run",
+            "--to",
+            "spec_review",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("spec_draft must be PASS before spec_review", out.getvalue())
+
+    def test_strict_validate_rejects_skipped_outside_allowed_mode(self):
+        self.controller.main([
+            "init",
+            "Strict skip",
+            "--run-id",
+            "strict-skip-run",
+            "--mode",
+            "STANDARD",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-skip-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["stages"]["spec_review"] = "SKIPPED"
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "validate",
+            "strict-skip-run",
+            "--strict",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 1)
+        self.assertIn("spec_review cannot be SKIPPED in STANDARD mode", out.getvalue())
+
+    def test_light_skipped_stages_pass_full_gate_to_solution_design(self):
+        self.controller.main([
+            "init",
+            "Light full gate",
+            "--run-id",
+            "light-gate-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        self.answer_interview_artifact("light-gate-run")
+
+        def record(stage, status):
+            out = io.StringIO()
+            code = self.controller.main([
+                "record-stage",
+                "--run-id",
+                "light-gate-run",
+                "--stage",
+                stage,
+                "--status",
+                status,
+                "--evidence",
+                f"docs/loopx/runs/light-gate-run/artifacts/{stage}.md",
+                "--project",
+                str(self.tmp),
+            ], stdout=out)
+            self.assertEqual(code, 0, out.getvalue())
+
+        record("requirement_intake", "PASS")
+        record("requirement_interview", "PASS")
+        out = io.StringIO()
+        self.controller.main([
+            "confirm-stage",
+            "--run-id",
+            "light-gate-run",
+            "--stage",
+            "requirement_interview",
+            "--evidence",
+            "user confirmed",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        record("spec_draft", "PASS")
+        record("spec_review", "SKIPPED")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "mode",
+            "light-gate-run",
+            "--select",
+            "LIGHT",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        self.assertEqual(code, 0, out.getvalue())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "light-gate-run",
+            "--to",
+            "solution_design",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        self.assertEqual(code, 0, out.getvalue())
+
+        for cmd in ("validate", "gate"):
+            out = io.StringIO()
+            code = self.controller.main([
+                cmd,
+                "light-gate-run",
+                "--project",
+                str(self.tmp),
+            ], stdout=out)
+            self.assertEqual(code, 0, out.getvalue())
+
+    def test_light_skipped_release_readiness_allows_final_report_close(self):
+        self.controller.main([
+            "init",
+            "Light release skip",
+            "--run-id",
+            "light-release-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "light-release-run"
+
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "light-release-run",
+            "--stage",
+            "final_report",
+            "--status",
+            "PASS",
+            "--evidence",
+            "docs/final.md",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        self.controller.main([
+            "record-stage",
+            "--run-id",
+            "light-release-run",
+            "--stage",
+            "release_readiness",
+            "--status",
+            "SKIPPED",
+            "--evidence",
+            "LIGHT 无发布窗口",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["git_gate"]["status"] = "PASS"
+        state["git_gate"]["diff_summary"] = "M docs"
+        state["mode_decision"] = {
+            "recommended": "LIGHT",
+            "selected": "LIGHT",
+            "selection_status": "CONFIRMED",
+            "selected_by": "user",
+            "reason": [],
+            "accepted_risk": {"selected_lower_than_recommended": False, "reason": ""},
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        self.controller.main([
+            "compound",
+            "light-release-run",
+            "--decision",
+            "skipped",
+            "--reason",
+            "收口测试无复用学习点。",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+
+        for cmd in ("validate", "gate"):
+            out = io.StringIO()
+            code = self.controller.main([
+                cmd,
+                "light-release-run",
+                "--project",
+                str(self.tmp),
+            ], stdout=out)
+            self.assertEqual(code, 0, out.getvalue())
+
+    def test_light_skipped_review_gates_allow_business_writes(self):
+        self.controller.main([
+            "init",
+            "Light business write",
+            "--run-id",
+            "light-write-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "light-write-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["current_stage"] = "development"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "SKIPPED",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+            "solution_review": "SKIPPED",
+            "test_design": "PASS",
+            "test_review": "SKIPPED",
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "can-write",
+            "--run-id",
+            "light-write-run",
+            "--kind",
+            "business",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0, out.getvalue())
+        self.assertIn("PASS business writes unlocked", out.getvalue())
+
+    def test_fail_review_blocks_stage_after_max_auto_repair(self):
+        self.controller.main([
+            "init",
+            "Repair limit",
+            "--run-id",
+            "repair-limit-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "repair-limit-run"
+        for _ in range(3):
+            out = io.StringIO()
+            code = self.controller.main([
+                "fail-review",
+                "--run-id",
+                "repair-limit-run",
+                "--from",
+                "solution_review",
+                "--return-to",
+                "solution_design",
+                "--item",
+                "W1",
+                "--reason",
+                "review failure",
+                "--project",
+                str(self.tmp),
+            ], stdout=out)
+            self.assertEqual(code, 0, out.getvalue())
+
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        ticket = json.loads((run_dir / "artifacts" / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["loop_attempts"]["solution_review"], 3)
+        self.assertEqual(state["stages"]["solution_review"], "BLOCKED")
+        self.assertEqual(ticket["stage_status"], "BLOCKED")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "advance",
+            "--run-id",
+            "repair-limit-run",
+            "--to",
+            "test_design",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        self.assertEqual(code, 1)
+        self.assertIn("solution_review is BLOCKED; return before advancing", out.getvalue())
+
+        # fail_review 后 worklist 与 state 同步，strict 校验不报 stage 状态漂移。
+        out = io.StringIO()
+        self.controller.main([
+            "validate",
+            "repair-limit-run",
+            "--strict",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        self.assertNotIn("worklist.stages[solution_review].status must match", out.getvalue())
+
+    def test_close_repair_clears_blocked_stage_for_retry(self):
+        self.controller.main([
+            "init",
+            "Repair recover",
+            "--run-id",
+            "repair-recover-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "repair-recover-run"
+        for _ in range(3):
+            self.controller.main([
+                "fail-review",
+                "--run-id",
+                "repair-recover-run",
+                "--from",
+                "solution_review",
+                "--return-to",
+                "solution_design",
+                "--item",
+                "W1",
+                "--reason",
+                "review failure",
+                "--project",
+                str(self.tmp),
+            ], stdout=io.StringIO())
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "close-repair",
+            "--run-id",
+            "repair-recover-run",
+            "--item",
+            "W1",
+            "--artifact",
+            "stage-results/06-solution-design.json",
+            "--revision",
+            "2",
+            "--change",
+            "fixed",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+
+        self.assertEqual(code, 0, out.getvalue())
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        self.assertNotIn("solution_review", state["stages"])
+        ticket = json.loads((run_dir / "artifacts" / "repair-tickets" / "W1.json").read_text(encoding="utf-8"))
+        self.assertEqual(ticket["status"], "CLOSED")
 
     def test_interview_command_generates_artifact_and_updates_current_stage(self):
         self.controller.main([
@@ -1949,7 +2381,7 @@ items:
         self.assertEqual(state["current_stage"], "solution_design")
         self.assertEqual(state["active_agent"], "solution-designer")
         self.assertEqual(state["next_action"], "repair_solution_design")
-        self.assertEqual(state["loop_attempts"]["W1"], 1)
+        self.assertEqual(state["loop_attempts"]["solution_review"], 1)
         self.assertEqual(state["stages"]["solution_review"], "CHANGES_REQUIRED")
         self.assertEqual(ticket["type"], "review_failed")
         self.assertEqual(ticket["from_stage"], "solution_review")
@@ -1957,6 +2389,7 @@ items:
         self.assertEqual(ticket["assigned_to"], "solution-designer")
         self.assertEqual(ticket["attempt"], 1)
         self.assertEqual(ticket["status"], "OPEN")
+        self.assertEqual(ticket["stage_status"], "CHANGES_REQUIRED")
         self.assertEqual(ticket["required_changes"], [
             "ShopLimitExceededException must be in com.crosscomm.admin.exception",
             "GlobalExceptionHandler must remain in controller.handler",

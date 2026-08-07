@@ -1,13 +1,9 @@
 {
   "type": "object",
   "required": [
-    "show_on_every_update",
     "worklist"
   ],
   "properties": {
-    "show_on_every_update": {
-      "type": "boolean"
-    },
     "worklist": {
       "type": "string"
     },

@@ -1,21 +1,11 @@
 {
   "type": "object",
   "required": [
-    "required",
-    "mode",
     "status",
     "artifact",
-    "unanswered_questions",
-    "can_skip"
+    "unanswered_questions"
   ],
   "properties": {
-    "required": {
-      "type": "boolean"
-    },
-    "mode": {
-      "type": "string",
-      "enum": ["LIGHT", "STANDARD", "FULL"]
-    },
     "status": {
       "type": "string",
       "enum": ["NOT_STARTED", "IN_PROGRESS", "PASS", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN"]
@@ -25,9 +15,6 @@
     },
     "unanswered_questions": {
       "type": "integer"
-    },
-    "can_skip": {
-      "type": "boolean"
     },
     "blocking_questions": {
       "type": "array",

@@ -7,13 +7,8 @@ from datetime import datetime
 from pathlib import Path
 
 from loopx_controller_io import append_event, get_run_dir, load_schema, load_state, save_state, validate_schema
-from loopx_controller_state import resolve_run_id
+from loopx_controller_state import resolve_run_id, slugify
 from loopx_controller_yaml import YamlSubsetError, parse_yaml_subset
-
-
-def slugify(text):
-    slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
-    return slug[:64] or "loopx-learning"
 
 
 def compound_artifact_rel(run_id):
@@ -21,7 +16,7 @@ def compound_artifact_rel(run_id):
 
 
 def project_solution_rel(category, title):
-    return f"docs/loopx/solutions/{slugify(category)}/{slugify(title)}.md"
+    return f"docs/loopx/solutions/{slugify(category, max_length=64)}/{slugify(title, max_length=64)}.md"
 
 
 def render_scalar(value):

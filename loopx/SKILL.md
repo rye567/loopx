@@ -32,7 +32,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 ```
 
 7. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行还需要阶段 `PASS`、写入保护检查、health 检查和未覆盖项说明。
-8. 需求采访和方案审核通过后先落为 `NEED_HUMAN`；用户确认后运行 `confirm-stage --stage requirement_interview` 或对应阶段才能继续。代码审查、测试审核和发布就绪 `PASS` 后可继续；可选 Provider 只按 `workflow.md` 的通用契约执行，不得新增阶段或绕过人工门。
+8. 需求采访和方案审核通过后先落为 `NEED_HUMAN`，用户确认后运行 `confirm-stage --stage requirement_interview`（方案审核对应 `confirm-stage --stage solution_review`）才能继续；实现细节见 `workflow.md`「人工确认门」。可选 Provider 只按 `workflow.md` 的通用契约执行，不得新增阶段或绕过人工门。
 
 ## 入口
 
