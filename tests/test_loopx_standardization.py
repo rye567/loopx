@@ -19,8 +19,8 @@ class LoopXStandardizationTest(unittest.TestCase):
     def setUp(self):
         self.check = load_check_module()
 
-    def test_standardization_assets_pass_kit_harness(self):
-        report = self.check.evaluate_kit(ROOT)
+    def test_standardization_assets_pass_package_harness(self):
+        report = self.check.evaluate_package(ROOT)
         messages = "\n".join(f"{item.name}: {item.message}" for item in report.checks)
         self.assertEqual(report.status, self.check.PASS, messages)
 

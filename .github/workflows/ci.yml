@@ -14,5 +14,5 @@ jobs:
           python-version: '3.x'
       - name: 运行单元测试
         run: python -m unittest discover -s tests
-      - name: 运行 LoopX kit harness
-        run: python loopx/tools/loopx_check.py kit --root .
+      - name: 运行 LoopX package harness
+        run: python loopx/tools/loopx_check.py package --root .

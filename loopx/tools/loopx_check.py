@@ -3,7 +3,7 @@
 
 本工具只依赖 Python 标准库，支持两种模式：
 
-- kit：检查 LoopX kit 是否包含标准化资产。
+- package：检查 LoopX 包是否包含标准化资产。
 - project：检查目标项目的本地 LoopX run 结构和证据。
 """
 
@@ -163,7 +163,7 @@ def check_skill_contracts(root: Path) -> CheckResult:
     )
 
 
-def evaluate_kit(root: Path) -> HarnessReport:
+def evaluate_package(root: Path) -> HarnessReport:
     root = root.resolve()
     checks = [
         check_required_files(root, "标准", "loopx/standards", REQUIRED_STANDARDS),
@@ -174,7 +174,7 @@ def evaluate_kit(root: Path) -> HarnessReport:
         check_skill_contracts(root),
     ]
     status = BLOCKED if any(check.status == BLOCKED for check in checks) else PASS
-    return HarnessReport(mode="kit", root=str(root), status=status, checks=checks)
+    return HarnessReport(mode="package", root=str(root), status=status, checks=checks)
 
 
 def load_json(path: Path) -> tuple[dict | None, str | None]:
@@ -316,7 +316,7 @@ def print_text(report: HarnessReport) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="LoopX local harness checks.")
-    parser.add_argument("mode", choices=["kit", "project"], help="Check LoopX kit assets or a target project.")
+    parser.add_argument("mode", choices=["package", "project"], help="Check LoopX package assets or a target project.")
     parser.add_argument("--root", default=".", help="Repository or project root.")
     parser.add_argument("--format", choices=["text", "json"], default="text")
     return parser
@@ -325,7 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = Path(args.root)
-    report = evaluate_kit(root) if args.mode == "kit" else evaluate_project(root)
+    report = evaluate_package(root) if args.mode == "package" else evaluate_project(root)
     if args.format == "json":
         print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
     else:

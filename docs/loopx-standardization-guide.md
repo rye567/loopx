@@ -59,7 +59,7 @@ Controller = 状态和推进负责人
 在本仓库内使用：
 
 ```bash
-python loopx/tools/loopx_check.py kit --root .
+python loopx/tools/loopx_check.py package --root .
 ```
 
 在目标项目中使用：
