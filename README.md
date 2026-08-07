@@ -147,10 +147,6 @@ LoopX is probably too heavy for:
 - Throwaway prototypes.
 - Purely exploratory spikes with no release intent.
 
-## Recommended GitHub Topics
-
-`codex`, `claude-code`, `ai-agents`, `agent-workflow`, `staged-workflow`, `developer-tools`, `automation`, `python`, `prompt-engineering`
-
 ## Update
 
 ```bash

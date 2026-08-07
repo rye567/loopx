@@ -149,10 +149,6 @@ LoopX 可能不适合：
 - 一次性原型。
 - 没有发布意图的纯探索实验。
 
-## 推荐 GitHub Topics
-
-`codex`, `claude-code`, `ai-agents`, `agent-workflow`, `staged-workflow`, `developer-tools`, `automation`, `python`, `prompt-engineering`
-
 ## 更新
 
 ```bash
