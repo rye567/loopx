@@ -48,36 +48,40 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
 
 ## 安装
 
-克隆仓库：
+### 插件市场安装（推荐）
+
+LoopX 以自建插件市场形式发布。在 ZCode 或 Claude Code 中先添加市场源，再安装插件；后续版本跟随新 tag 自动可更新：
 
 ```bash
-git clone git@github.com:rye567/loopx.git
-cd loopx
+plugin marketplace add https://github.com/rye567/loopx
+plugin install loopx
 ```
 
-把 [`loopx/`](loopx/) 目录复制或链接到目标工具的 skills 目录，并保留目录名为 `loopx`。
+Codex 用户：仓库提供 `.codex-plugin/plugin.json` 清单，通过 Codex 的插件流程添加同一仓库即可。
 
-推荐使用实时链接，这样更新仓库后 Codex 和 Claude Code 会直接读到最新组件。
+### 手动链接（备选）
 
-Windows PowerShell：
-
-```powershell
-# Codex
-New-Item -ItemType Junction `
-  -Path "$HOME\.codex\skills\loopx" `
-  -Target "E:\workspace\loopx\loopx"
-
-# Claude Code
-New-Item -ItemType Junction `
-  -Path "$HOME\.claude\skills\loopx" `
-  -Target "E:\workspace\loopx\loopx"
-```
+克隆仓库，把 [`loopx/`](loopx/) 目录复制或链接到目标工具的 skills 目录，并保留目录名为 `loopx`。
 
 Unix-like 系统：
 
 ```bash
+git clone git@github.com:rye567/loopx.git
+cd loopx
 ln -s "$PWD/loopx" "$HOME/.codex/skills/loopx"
 ln -s "$PWD/loopx" "$HOME/.claude/skills/loopx"
+```
+
+Windows PowerShell：
+
+```powershell
+New-Item -ItemType Junction `
+  -Path "$HOME\.codex\skills\loopx" `
+  -Target "E:\workspace\loopx\loopx"
+
+New-Item -ItemType Junction `
+  -Path "$HOME\.claude\skills\loopx" `
+  -Target "E:\workspace\loopx\loopx"
 ```
 
 ## 使用

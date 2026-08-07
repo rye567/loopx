@@ -48,34 +48,41 @@ The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The con
 
 ## Install
 
-Clone the repository:
+### Plugin marketplace (recommended)
+
+LoopX ships as a self-hosted plugin marketplace. In ZCode or Claude Code, add
+the marketplace once, then install the plugin — updates follow new tags:
+
+```bash
+plugin marketplace add https://github.com/rye567/loopx
+plugin install loopx
+```
+
+For Codex, the same repository provides a `.codex-plugin/plugin.json`
+manifest; add it through your Codex plugin flow.
+
+### Manual link (alternative)
+
+Clone the repository and link or copy the [`loopx/`](loopx/) directory into
+your tool's skills directory, keeping the directory name as `loopx`:
 
 ```bash
 git clone git@github.com:rye567/loopx.git
 cd loopx
+ln -s "$PWD/loopx" "$HOME/.codex/skills/loopx"
+ln -s "$PWD/loopx" "$HOME/.claude/skills/loopx"
 ```
 
-Link or copy the [`loopx/`](loopx/) directory into your tool's skills directory and keep the directory name as `loopx`.
-
-Recommended live-link setup:
+PowerShell (Windows):
 
 ```powershell
-# Codex
 New-Item -ItemType Junction `
   -Path "$HOME\.codex\skills\loopx" `
   -Target "E:\workspace\loopx\loopx"
 
-# Claude Code
 New-Item -ItemType Junction `
   -Path "$HOME\.claude\skills\loopx" `
   -Target "E:\workspace\loopx\loopx"
-```
-
-On Unix-like systems, use a symbolic link:
-
-```bash
-ln -s "$PWD/loopx" "$HOME/.codex/skills/loopx"
-ln -s "$PWD/loopx" "$HOME/.claude/skills/loopx"
 ```
 
 ## Use

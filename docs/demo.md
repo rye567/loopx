@@ -10,7 +10,10 @@ get the same result.
 ```bash
 mkdir loopx-demo && cd loopx-demo
 git init
-# clone LoopX somewhere, then use its controller:
+# install LoopX once (or manual: git clone + ln -s "$PWD/loopx" "$HOME/.claude/skills/loopx"):
+plugin marketplace add https://github.com/rye567/loopx
+plugin install loopx
+# then use its controller:
 python3 <loopx>/loopx/tools/loopx_controller.py --help
 ```
 

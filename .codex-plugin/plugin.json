@@ -1,0 +1,36 @@
+{
+  "name": "loopx",
+  "version": "0.1.0",
+  "description": "Staged workflow checks for AI coding agents: requirement interview, spec, review gates, test design, implementation, validation and release readiness with a local state controller.",
+  "author": {
+    "name": "rye567",
+    "url": "https://github.com/rye567"
+  },
+  "homepage": "https://github.com/rye567/loopx",
+  "repository": "https://github.com/rye567/loopx",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "claude-code",
+    "ai-agents",
+    "agent-workflow",
+    "quality-gate",
+    "code-review",
+    "developer-tools"
+  ],
+  "skills": "./loopx",
+  "hooks": {},
+  "interface": {
+    "displayName": "LoopX",
+    "shortDescription": "Quality gates for AI coding agents",
+    "longDescription": "LoopX forces risky AI coding work through a staged workflow: requirement interview, spec drafting, human-confirmed reviews, test planning, implementation, and release checks. A local controller persists run state and locks business writes until review gates pass.",
+    "developerName": "rye567",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/rye567/loopx"
+  }
+}

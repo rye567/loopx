@@ -17,12 +17,21 @@ LoopX v0.1.0 is the first public release of the cross-tool quality gate skill pa
 
 ## Install
 
+Plugin marketplace (recommended):
+
+```bash
+plugin marketplace add https://github.com/rye567/loopx
+plugin install loopx
+```
+
+Manual:
+
 ```bash
 git clone git@github.com:rye567/loopx.git
 cd loopx
+ln -s "$PWD/loopx" "$HOME/.claude/skills/loopx"
+ln -s "$PWD/loopx" "$HOME/.codex/skills/loopx"
 ```
-
-Link or copy `loopx/` into your tool skills directory as `loopx`.
 
 ## Suggested Announcement
 

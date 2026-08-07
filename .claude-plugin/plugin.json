@@ -1,0 +1,22 @@
+{
+  "name": "loopx",
+  "description": "Staged workflow checks for AI coding agents: requirement interview, spec, review gates, test design, implementation, validation and release readiness with a local state controller.",
+  "version": "0.1.0",
+  "author": {
+    "name": "rye567",
+    "url": "https://github.com/rye567"
+  },
+  "homepage": "https://github.com/rye567/loopx",
+  "repository": "https://github.com/rye567/loopx",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "claude-code",
+    "ai-agents",
+    "agent-workflow",
+    "quality-gate",
+    "code-review",
+    "staged-workflow",
+    "developer-tools"
+  ]
+}

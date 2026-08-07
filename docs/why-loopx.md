@@ -70,8 +70,11 @@ enforcement, LoopX as the workflow contract.
 ## Try it in 5 minutes
 
 ```bash
-git clone git@github.com:rye567/loopx.git
-cd loopx
+plugin marketplace add https://github.com/rye567/loopx
+plugin install loopx
+
+# or manual: git clone + ln -s "$PWD/loopx" "$HOME/.claude/skills/loopx"
+
 python3 loopx/tools/loopx_controller.py init \
   "Add dark mode toggle" --run-id demo --project .
 ```

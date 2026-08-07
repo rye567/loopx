@@ -1,0 +1,20 @@
+{
+  "name": "loopx",
+  "description": "LoopX quality gates for AI coding agents: staged workflow with evidence-backed reviews for Codex and Claude Code.",
+  "owner": {
+    "name": "rye567",
+    "url": "https://github.com/rye567"
+  },
+  "plugins": [
+    {
+      "name": "loopx",
+      "description": "Staged workflow checks for AI coding agents: requirement interview, spec, review gates, test design, implementation, validation and release readiness with a local state controller.",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "rye567",
+        "url": "https://github.com/rye567"
+      }
+    }
+  ]
+}
