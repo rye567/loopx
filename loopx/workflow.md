@@ -98,6 +98,7 @@ Provider 结果写入 `docs/loopx/runs/<run_id>/artifacts/integrations/<provider
 - `LIGHT` 只有在项目分配结果中显式输出 `mode: LIGHT`、影响范围、跳过的审核门和最小验证计划，且 `stage_result.status=PASS` 后，才允许轻量开发写入。
 - 非显式 `LIGHT` 不得走轻流程；执行中发现实际影响超过 `LIGHT` 条件时，必须立即停止写入，升级为 `STANDARD` 或 `FULL`，并回到对应阶段重新执行。
 - `CHANGES_REQUIRED` 或 `BLOCKED` 状态下不得继续后续阶段；只能修正 `return_to` 指定阶段、补充证据或等待用户处理。
+- 返工写入保护：存在 `CHANGES_REQUIRED` 阶段时，`can-write --kind business` 仅在满足以下条件时放行——当前阶段为 `development`、存在 `return_to=development` 的开放返工单、方案审核和测试审核已通过；`BLOCKED` 始终锁定写入，无返工单的越级写入仍被禁止。
 
 ## 人工确认门
 

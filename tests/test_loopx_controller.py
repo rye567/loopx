@@ -1501,6 +1501,139 @@ decision: captured
         ], stdout=out)
         self.assertNotIn("worklist.stages[solution_review].status must match", out.getvalue())
 
+    def test_can_write_allows_dev_repair_ticket_but_blocks_without_one(self):
+        self.controller.main([
+            "init",
+            "Repair write gate",
+            "--run-id",
+            "repair-write-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "repair-write-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["current_stage"] = "development"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "PASS",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+            "solution_review": "PASS",
+            "test_design": "PASS",
+            "test_review": "PASS",
+            "development": "PASS",
+            "quality_audit": "PASS",
+            "code_review": "PASS",
+            "test_execution": "PASS",
+            "health_gate": "CHANGES_REQUIRED",
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+        # 无返工单：CHANGES_REQUIRED 仍锁定写入（防止越级写入）。
+        out = io.StringIO()
+        code = self.controller.main([
+            "can-write",
+            "--run-id",
+            "repair-write-run",
+            "--kind",
+            "business",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        self.assertEqual(code, 1)
+        self.assertIn("health_gate is CHANGES_REQUIRED", out.getvalue())
+
+        # 登记指向 development 的返工单后：修复性写入放行（不再死锁）。
+        self.controller.main([
+            "fail-review",
+            "--run-id",
+            "repair-write-run",
+            "--from",
+            "health_gate",
+            "--return-to",
+            "development",
+            "--item",
+            "W4",
+            "--reason",
+            "分片协调器未完成",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        out = io.StringIO()
+        code = self.controller.main([
+            "can-write",
+            "--run-id",
+            "repair-write-run",
+            "--kind",
+            "business",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        self.assertEqual(code, 0, out.getvalue())
+        self.assertIn("PASS business writes unlocked", out.getvalue())
+
+    def test_can_write_stays_locked_when_stage_blocked_despite_repair_ticket(self):
+        self.controller.main([
+            "init",
+            "Blocked write gate",
+            "--run-id",
+            "blocked-write-run",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        run_dir = self.tmp / "docs" / "loopx" / "runs" / "blocked-write-run"
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["current_stage"] = "development"
+        state["stages"] = {
+            "environment_check": "PASS",
+            "requirement_intake": "PASS",
+            "requirement_interview": "PASS",
+            "spec_draft": "PASS",
+            "spec_review": "PASS",
+            "mode_selection": "PASS",
+            "solution_design": "PASS",
+            "solution_review": "PASS",
+            "test_design": "PASS",
+            "test_review": "PASS",
+            "health_gate": "BLOCKED",
+        }
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        # 即使有指向 development 的开放返工单，BLOCKED 也必须锁定写入（等待人工处理）。
+        self.controller.main([
+            "fail-review",
+            "--run-id",
+            "blocked-write-run",
+            "--from",
+            "health_gate",
+            "--return-to",
+            "development",
+            "--item",
+            "W5",
+            "--reason",
+            "环境问题待人工处理",
+            "--project",
+            str(self.tmp),
+        ], stdout=io.StringIO())
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        state["stages"]["health_gate"] = "BLOCKED"
+        (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+        out = io.StringIO()
+        code = self.controller.main([
+            "can-write",
+            "--run-id",
+            "blocked-write-run",
+            "--kind",
+            "business",
+            "--project",
+            str(self.tmp),
+        ], stdout=out)
+        self.assertEqual(code, 1)
+        self.assertIn("health_gate is BLOCKED", out.getvalue())
+
     def test_close_repair_clears_blocked_stage_for_retry(self):
         self.controller.main([
             "init",

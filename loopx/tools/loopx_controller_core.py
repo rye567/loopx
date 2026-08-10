@@ -413,7 +413,7 @@ def cmd_can_write(args, stdout):
     if args.kind == "loopx":
         print("PASS loopx writes allowed", file=stdout)
         return 0
-    blockers = business_write_blockers(state)
+    blockers = business_write_blockers(state, project, run_id)
     if blockers:
         print("FAIL business writes locked", file=stdout)
         for blocker in blockers:

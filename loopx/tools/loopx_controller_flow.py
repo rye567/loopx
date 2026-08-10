@@ -51,6 +51,22 @@ def first_changes_required(stages):
     return None
 
 
+def first_stage_with_status(stages, status):
+    for stage in STAGE_SEQUENCE:
+        if stages.get(stage) == status:
+            return stage
+    return None
+
+
+def has_open_dev_repair_ticket(project, run_id, state):
+    if project is None or run_id is None:
+        return False
+    return any(
+        ticket.get("status") == "OPEN" and ticket.get("return_to") == "development"
+        for ticket in iter_repair_tickets(project, run_id, state)
+    )
+
+
 def confirmation_next_action(stage):
     return f"confirm-stage --stage {stage}"
 
@@ -223,7 +239,7 @@ def advance_blockers(project, run_id, state, target_stage):
     return blockers
 
 
-def business_write_blockers(state):
+def business_write_blockers(state, project=None, run_id=None):
     blockers = []
     if state.get("current_stage") != "development":
         blockers.append("current_stage must be development")
@@ -236,9 +252,16 @@ def business_write_blockers(state):
             status == "SKIPPED" and stage_can_be_skipped(stage, state)
         ):
             blockers.append(f"{stage} must be PASS before business writes")
-    changed = first_changes_required(stages)
-    if changed:
-        blockers.append(f"{changed} is {state['stages'][changed]}")
+    # BLOCKED 始终锁定写入：它表示等待人工处理，不属于自动返工路径。
+    blocked = first_stage_with_status(stages, "BLOCKED")
+    if blocked:
+        blockers.append(f"{blocked} is BLOCKED")
+    # CHANGES_REQUIRED 若存在指向 development 的开放返工单，是返工信号而非阻塞：
+    # 开发必须能修改代码来修复该阶段，否则状态机自我死锁（修复必须先过 can-write，
+    # 而 can-write 又因待修复的 CHANGES_REQUIRED 拒绝写入）。
+    changed = first_stage_with_status(stages, "CHANGES_REQUIRED")
+    if changed and not has_open_dev_repair_ticket(project, run_id, state):
+        blockers.append(f"{changed} is {stages[changed]}")
     return blockers
 
 
