@@ -1,6 +1,6 @@
 {
   "name": "loopx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Staged workflow checks for AI coding agents: requirement interview, spec, review gates, test design, implementation, validation and release readiness with a local state controller.",
   "author": {
     "name": "rye567",

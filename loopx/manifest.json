@@ -1,6 +1,6 @@
 {
   "name": "loopx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Git-maintained LoopX skill package for Codex and Claude Code.",
   "skillFile": "SKILL.md",
   "controllerScript": "tools/loopx_controller.py"
