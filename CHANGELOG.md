@@ -4,6 +4,13 @@ All notable changes to LoopX are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Repair write-lock deadlock**: `can-write --kind business` rejected writes whenever any stage was `CHANGES_REQUIRED`, including the stage the developer was supposed to fix — the repair path deadlocked itself. Now a `CHANGES_REQUIRED` stage no longer locks business writes when the run is at `development` with an open repair ticket whose `return_to=development` (and solution/test reviews are satisfied). `BLOCKED` still always locks writes, and ticket-less `CHANGES_REQUIRED` still blocks out-of-band writes.
+- `workflow.md` write-protection section documents the repair-write contract.
+
 ## [0.1.0] - 2026-08-07
 
 First public release of the cross-tool quality gate skill package for Codex and Claude Code.
