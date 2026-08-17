@@ -7,14 +7,14 @@
 
 from pathlib import Path
 
-from loopx_controller_io import load_state, read_json, write_json
+from loopx_controller_io import load_state, project_path, read_json, write_json
 
 
 def repair_ticket_root(project, run_id, state=None):
     state = state or load_state(project, run_id)
     path = Path(state.get("repair_tickets") or f"docs/loopx/runs/{run_id}/artifacts/repair-tickets")
     if not path.is_absolute():
-        path = project / path
+        path = project_path(project, path)
     return path
 
 

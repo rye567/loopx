@@ -4,5 +4,26 @@
   "owner": "rye567",
   "description": "LoopX Git-maintained cross-tool skill package for Codex and Claude Code.",
   "skillPath": "loopx",
-  "controllerScript": "loopx/tools/loopx_controller.py"
+  "controllerScript": "loopx/tools/loopx_controller.py",
+  "resources": {
+    "standards": [
+      "loopx/standards/catalog.yml",
+      "loopx/standards/principles.md",
+      "loopx/standards/architecture-standard.md",
+      "loopx/standards/security-standard.md",
+      "loopx/standards/performance-standard.md",
+      "loopx/standards/reliability-observability-standard.md"
+    ],
+    "schemas": [
+      "loopx/schemas/standard-catalog.schema.json",
+      "loopx/schemas/project-policy.schema.json",
+      "loopx/schemas/solution.schema.json",
+      "loopx/schemas/test-plan.schema.json",
+      "loopx/schemas/development-evidence.schema.json",
+      "loopx/schemas/quality-result.schema.json",
+      "loopx/schemas/performance-result.schema.json",
+      "loopx/schemas/security-result.schema.json"
+    ],
+    "policyTemplate": "loopx/templates/loopx-policy.yml"
+  }
 }

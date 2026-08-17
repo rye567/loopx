@@ -6,11 +6,11 @@
 
 ## 输出
 
-1. Findings：按严重程度排序，带文件和行号。
-2. Open Questions：不确定点。
-3. Change Summary：简短变更摘要。
-4. Verdict：`PASS`、`CHANGES_REQUIRED` 或 `BLOCKED`。
-5. Evidence：本地硬证据和 CI/远端未覆盖范围。
+1. 发现：按严重程度排序，带文件和行号。
+2. 未决问题：仍需确认的内容。
+3. 变更摘要：简述实际变化。
+4. 结论：`PASS`、`CHANGES_REQUIRED` 或 `BLOCKED`。
+5. 证据：本地硬证据和 CI/远端未覆盖范围。
 
 ## 检查
 
@@ -18,4 +18,4 @@
 - 发现问题时返回 `CHANGES_REQUIRED` 且 `return_to: 开发`。
 - 环境、权限或需求边界导致无法判断时返回 `BLOCKED`。
 - 通过时返回 `PASS`，可自动进入测试执行。
-- 必须输出 worklist 状态更新和 `stage_result`。
+- 必须核对实际 diff 与工作项写入范围，并输出工作项状态更新和 `stage_result`。

@@ -37,7 +37,7 @@ LoopX 可以调用外部 Provider 扩展，但 Provider 不是核心依赖，也
 
 - `before_init`：需要由 Provider 把外部引用规范化为需求正文时，在 controller `init` 前调用。此时 `run_id` 可为空，但 `request_id` 必填；该事件必须只读，禁止外部创建、更新或删除副作用。
 - `after_stage`：阶段已经 `PASS` 后调用；带人工确认的阶段必须在 `confirm-stage` 后才允许发布该事件。
-- `before_close`：最终报告、gate、Git Gate 和 Compound Capture 证据齐全后，`close` 前调用。
+- `before_close`：最终报告、严格流程检查、Git 变更检查和经验沉淀证据齐全后，`close` 前调用。
 
 ### 请求
 
@@ -85,22 +85,22 @@ integration_result:
 - `BLOCKED`：只阻止对应外部动作；可以继续保留本地阶段证据，但不得宣称外部集成完成。
 - `PARTIAL`：已有部分外部副作用，必须保存映射并停止后续外部写；不得静默降级或盲目重试。
 
-Provider 结果写入 `docs/loopx/runs/<run_id>/artifacts/integrations/<provider_id>/`。`before_init` 结果在正式 run 创建后补写。Provider 不得调用 controller 推进阶段或直接修改 `state.json`。
+Provider 结果写入逻辑路径 `docs/loopx/runs/<run_id>/artifacts/integrations/<provider_id>/`。新运行通过 `import-artifact` 收纳到单文件状态容器；`before_init` 结果在正式 run 创建后补写。Provider 不得调用 controller 推进阶段或直接修改逻辑 `state.json`。
 
-如果 Provider 在 `before_init` 被跳过，而原始输入仍不足以生成需求正文，按 LoopX 核心需求输入门进入 `NEED_HUMAN`；不得用空需求初始化。
+如果 Provider 在 `before_init` 被跳过，而原始输入仍不足以生成需求正文，按 LoopX 核心需求输入检查进入 `NEED_HUMAN`；不得用空需求初始化。
 
 ## 写入保护
 
-- 阶段文档和分析文档可以在对应阶段写入，统一写入项目根目录下的 `docs/loopx/<date>-<slug>/`；`docs/loopx/runs/<run_id>/` 只用于 controller 状态、worklist、events、stage-results 和自动生成 artifact。该目录是机器生成状态，收口时 `close` 会把 `events.jsonl`、`repair-tickets/` 归档到 `artifacts/archive/`，其余运行状态保留。
+- 阶段文档和分析文档可以在对应阶段写入，统一写入项目根目录下的 `docs/loopx/<date>-<slug>/`。新运行的 controller 状态、worklist、events、stage-results 和自动 artifact 收纳在用户状态目录的单个 `run.json`；`docs/loopx/runs/<run_id>/...` 是稳定逻辑路径。已有项目目录运行仍按原格式保留和收口。
 - 未声明执行深度前，不得进行开发写入。
 - `STANDARD` 和 `FULL` 未通过方案审核，不得进入开发；未通过测试用例审核，不得进入开发。
 - `STANDARD` 和 `FULL` 只有到 `10. 开发` 且上游放行条件满足时，才允许开发写入。
-- `LIGHT` 只有在项目分配结果中显式输出 `mode: LIGHT`、影响范围、跳过的审核门和最小验证计划，且 `stage_result.status=PASS` 后，才允许轻量开发写入。
+- `LIGHT` 只有在项目分配结果中显式输出 `mode: LIGHT`、影响范围、跳过的审核检查和最小验证计划，且 `stage_result.status=PASS` 后，才允许轻量开发写入。
 - 非显式 `LIGHT` 不得走轻流程；执行中发现实际影响超过 `LIGHT` 条件时，必须立即停止写入，升级为 `STANDARD` 或 `FULL`，并回到对应阶段重新执行。
 - `CHANGES_REQUIRED` 或 `BLOCKED` 状态下不得继续后续阶段；只能修正 `return_to` 指定阶段、补充证据或等待用户处理。
 - 返工写入保护：存在 `CHANGES_REQUIRED` 阶段时，`can-write --kind business` 仅在满足以下条件时放行——当前阶段为 `development`、存在 `return_to=development` 的开放返工单、方案审核和测试审核已通过；`BLOCKED` 始终锁定写入，无返工单的越级写入仍被禁止。
 
-## 人工确认门
+## 人工确认
 
 以下阶段 `PASS` 后必须等待用户确认，不得全自动继续：
 
@@ -109,7 +109,7 @@ Provider 结果写入 `docs/loopx/runs/<run_id>/artifacts/integrations/<provider
 
 控制器层面使用中间状态表达人工确认：agent 在 `requirement_interview` 或 `solution_review` 记录 `PASS` 时，实际落库为 `NEED_HUMAN`，`next_action` 为 `confirm-stage --stage <stage>`。只有用户确认后执行 `confirm-stage`，该阶段才会变为 `PASS` 并允许继续推进。需求采访确认是生成 Spec 的前置条件：`requirement_interview NEED_HUMAN -> confirm-stage -> requirement_interview PASS -> spec_draft`。
 
-如果用户明确说“本次全自动”“跳过人工确认”或“恢复自动推进”，才可以取消本次确认门。高风险动作仍必须单独确认。
+如果用户明确说“本次全自动”“跳过人工确认”或“恢复自动推进”，才可以取消本次确认要求。高风险动作仍必须单独确认。
 
 ## 阶段
 
@@ -122,12 +122,12 @@ Provider 结果写入 `docs/loopx/runs/<run_id>/artifacts/integrations/<provider
 6. 方案设计：方案、数据流、接口、迁移/兼容计划、影响范围。
 7. 方案审核：需求匹配、设计原则、项目 harness、风险审核结论。
 8. 测试用例设计：业务/API 数据准备、执行入口、断言、清理。
-9. 测试用例审核：覆盖率、清理策略、风险闭环。
+9. 测试用例审核：覆盖率、清理策略、风险处理结果。
 10. 开发：实现、补测试、集成、最小必要验证。
 11. 通用质量审计：检查写入条件、阶段证据、worklist、设计/实现/验证一致性。
 12. 代码审查：diff 审查、缺陷、缺失测试、模块边界和剩余风险。
 13. 测试执行：逐条对照测试用例执行并输出报告。
-14. 健康门：流程完成前执行 `/health`，把结果写入健康检查报告和最终结论。
+14. 健康检查：流程完成前执行 `/health`，把结果写入健康检查报告和最终结论。
 15. 发布就绪：检查发布、回滚、CI/远端覆盖和剩余风险。
 16. 最终报告：汇总阶段证据、验证结果、未覆盖项和下一步。
 
@@ -139,7 +139,7 @@ Provider 结果写入 `docs/loopx/runs/<run_id>/artifacts/integrations/<provider
 - 未命中关键触发项时，按 `score_rules` 对识别到的风险标签求和，并按 `thresholds` 选择 `LIGHT`、`STANDARD` 或 `FULL`。
 - 如果 `risk.yml` 不存在、无法读取或字段不完整，降级使用下列自然语言规则，并在项目分配结果中记录降级原因。
 
-- `LIGHT`：显式分级 -> 影响范围 -> 跳过门说明 -> 轻量开发 -> 最小验证 -> 轻量审查 -> 最终结论。
+- `LIGHT`：显式分级 -> 影响范围 -> 跳过检查说明 -> 轻量开发 -> 最小验证 -> 轻量审查 -> 最终结论。
 - `STANDARD`：环境检查 -> 项目分配 -> 方案 -> 测试 -> 实现 -> 审计 -> 审查 -> 验证。
 - `FULL`：环境检查 + 完整 00-10 阶段。适用于 API 契约、SQL、MQ、认证授权、租户/数据权限、核心业务状态、跨模块、迁移或需求不清晰的变更。
 
@@ -161,7 +161,7 @@ stage_result:
 
 每个非 `PASS` 结果必须包含失败原因、影响范围、证据、`return_to` 目标阶段、需要修正的 worklist item 和是否需要用户确认。Agent 不得只写”未通过”而不写下一步去向。
 
-合法 SKIPPED：只有 `MODE_SKIPPABLE_STAGES`（`loopx/tools/loopx_controller_contracts.py`，唯一事实源）中当前模式允许的阶段，`record-stage --status SKIPPED` 后才能继续推进；不允许的阶段 SKIPPED 会被 `advance` 和 `validate --strict` 拒绝。LIGHT 允许跳过审核/审计门（`spec_review`、`solution_design`、`solution_review`、`test_design`、`test_review`、`quality_audit`、`release_readiness`）；STANDARD/FULL 不允许跳过任何阶段。
+合法 SKIPPED：只有 `MODE_SKIPPABLE_STAGES`（`loopx/tools/loopx_controller_contracts.py`，唯一事实源）中当前模式允许的阶段，`record-stage --status SKIPPED` 后才能继续推进；不允许的阶段 SKIPPED 会被 `advance` 和 `validate --strict` 拒绝。LIGHT 允许跳过部分审核和审计检查（`spec_review`、`solution_design`、`solution_review`、`test_design`、`test_review`、`quality_audit`、`release_readiness`）；STANDARD/FULL 不允许跳过任何阶段。
 
 合法推进：
 
@@ -180,8 +180,8 @@ stage_result:
 | 10 开发 | 11 通用质量审计 | 10 开发 | 等用户处理 |
 | 11 通用质量审计 | 12 代码审查 | 6/8/10，按失败原因选择 | 等用户处理 |
 | 12 代码审查 | 13 测试执行 | 10 开发 | 等用户处理 |
-| 13 测试执行 | 14 健康门 | 8/10，按失败原因选择 | 等用户处理 |
-| 14 健康门 | 15 发布就绪 | 对应责任阶段 | 等用户处理 |
+| 13 测试执行 | 14 健康检查 | 8/10，按失败原因选择 | 等用户处理 |
+| 14 健康检查 | 15 发布就绪 | 对应责任阶段 | 等用户处理 |
 | 15 发布就绪 | 16 最终报告 | 对应责任阶段 | 等用户处理 |
 | 16 最终报告 | 完成 | 对应责任阶段 | 等用户处理 |
 
@@ -196,7 +196,7 @@ stage_result:
 - 通用质量审计失败：方案缺陷回方案设计，实现缺陷回开发，验证缺陷回测试用例设计，需求边界不清则回 Spec 或 `BLOCKED`。
 - 代码审查失败：`return_to: 开发`。
 - 测试执行失败：实现错误回开发，测试设计缺失回测试用例设计，环境问题 `BLOCKED`。
-- 健康门或发布就绪失败：根据失败项回到对应责任阶段；工具不可用但非必需时只能记录未覆盖，不能宣称完整通过。
+- 健康检查或发布就绪失败：根据失败项回到对应责任阶段；工具不可用但非必需时只能记录未覆盖，不能宣称完整通过。
 
 ## Worklist 状态
 
@@ -220,9 +220,10 @@ python tools/loopx_controller.py init "需求描述" --mode auto --risk-tags ten
 python tools/loopx_controller.py status
 python tools/loopx_controller.py status --tracking
 python tools/loopx_controller.py interview <run_id>
-# 回答 interview 命令输出的问题，并把回答写入 docs/loopx/runs/<run_id>/artifacts/interview.md 后才能记录 PASS
+# 回答 interview 命令输出的问题，将回答文件收纳为逻辑 interview.md 后才能记录 PASS
+python tools/loopx_controller.py import-artifact <run_id> --source /tmp/interview.md --target artifacts/interview.md
 python tools/loopx_controller.py record-stage --run-id <run_id> --stage requirement_interview --status PASS --evidence docs/loopx/runs/<run_id>/artifacts/interview.md
-python tools/loopx_controller.py confirm-stage --run-id <run_id> --stage requirement_interview --evidence "user confirmed interview"
+python tools/loopx_controller.py confirm-stage --run-id <run_id> --stage requirement_interview --evidence docs/loopx/<date>-<slug>/interview-confirmation.md
 python tools/loopx_controller.py spec <run_id>
 python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_draft --status PASS --evidence docs/loopx/runs/<run_id>/artifacts/spec.md
 python tools/loopx_controller.py record-stage --run-id <run_id> --stage spec_review --status PASS --evidence docs/loopx/runs/<run_id>/artifacts/spec.md
@@ -237,26 +238,28 @@ python tools/loopx_controller.py compound <run_id> --decision skipped --reason "
 python tools/loopx_controller.py compound <run_id> --decision captured --category workflow --title "标题" --summary "摘要" --learning "学习点" --prevention "预防规则" --applies-to loopx/tools --write-project-doc
 python tools/loopx_controller.py validate-learning docs/loopx/runs/<run_id>/artifacts/compound-capture.md
 python tools/loopx_controller.py record-stage --stage solution_design --status PASS --evidence docs/solution.md
+# 新存储下可直接导入结构化 JSON；旧项目目录运行仍可继续使用 --artifact
+python tools/loopx_controller.py record-stage --stage solution_design --status PASS --artifact-file solution=/tmp/solution.json
 python tools/loopx_controller.py advance --to solution_review
 python tools/loopx_controller.py record-stage --stage solution_review --status PASS --evidence stage-results/07-solution-review.json
-python tools/loopx_controller.py confirm-stage --stage solution_review --evidence "user confirmed solution review"
+python tools/loopx_controller.py confirm-stage --stage solution_review --evidence docs/loopx/<date>-<slug>/solution-confirmation.md
 python tools/loopx_controller.py fail-review --from solution_review --return-to solution_design --item W1 --reason "原因"
 python tools/loopx_controller.py claim-stage solution_design
 python tools/loopx_controller.py close-repair --item W1 --artifact stage-results/06-solution-design.json --revision 2 --change "修正说明"
 python tools/loopx_controller.py can-write --kind business
 ```
 
-控制器的最小状态目录为 `docs/loopx/runs/<run_id>/`，包含 `state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `artifacts/`。`init` 会自动写入 `stage-results/00-environment-check.json` 并把当前阶段推进到 `requirement_intake`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。确认门阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
+新运行默认保存在操作系统用户状态目录的 `<project-id>/<run_id>/run.json`；静稳时每个运行只有该文件，项目内不生成流程控制 JSON。容器内部仍保留 `state.json`、`worklist.yml`、`events.jsonl`、`stage-results/` 和 `artifacts/` 逻辑结构。`LOOPX_STATE_DIR` 可覆盖状态根目录，`LOOPX_STATE_BACKEND=project` 可创建旧目录格式的新运行；项目内已存在的 v1/v2 运行优先按旧格式继续，不迁移、不删除。`init` 会自动记录环境检查并推进到 `requirement_intake`。阶段产物写入后必须能通过 `python tools/loopx_controller.py validate <run_id>` 的结构校验；缺少 schema 必填字段、非法状态、未知阶段或不可解析 worklist 时，不得进入下一阶段。需要确认的阶段必须先落为 `NEED_HUMAN`，再由 `confirm-stage` 写入确认元数据后变为 `PASS`。
 
 `validate PASS` 只代表结构合法，不代表流程通过。进入下一阶段必须用 `advance --to ...`；遇到 `NEED_HUMAN` 必须等待用户确认并运行 `confirm-stage`，不得用 `advance` 或手改状态隐式批准。
 
-收口流程：先用 `gate` 通过严格流程门，用 `git-gate` 写入本地 Git 变更摘要，在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成 `artifacts/close-evidence.json`（阶段证据矩阵、Git Gate、CI/远端未覆盖项），并把运行期中间文件（`events.jsonl`、`artifacts/repair-tickets/`）自动归档到 `artifacts/archive/`；`stage-results/`、`close-evidence.json`、interview/spec 等可读产物保留在原地。`docs/loopx/runs/` 是机器生成状态目录，已加入 `.gitignore`，不应提交进版本库。
+收口流程：先用 `gate` 完成严格流程检查，用 `git-gate` 写入本地 Git 变更摘要，在 `final_report PASS` 后用 `close` 关闭整个 run。`close` 会生成逻辑产物 `artifacts/close-evidence.json`。新运行的全部中间状态仍收纳在同一个 `run.json` 中；旧项目目录运行继续把 `events.jsonl`、`artifacts/repair-tickets/` 归档到 `artifacts/archive/`。旧格式的 `docs/loopx/runs/` 已加入 `.gitignore`，不应提交进版本库。
 
 业务代码、测试、配置、SQL 或迁移脚本写入前必须用 `can-write --kind business` 得到 `PASS`，且 `solution_review` 必须已确认通过。
 
 Review 不通过或用户指出方案、目录、契约、异常、权限、租户或状态流转问题时，必须用 `fail-review` 创建返工任务，`claim-stage` 分配给 `return_to` 的 owner role，修原产物并追加 revision 后用 `close-repair` 关闭返工项；不得只手写 `state.current_stage`。
 
-Compound Capture 是收口辅助能力，不作为正式阶段插入状态机。每次收口前应记录 captured 或 skipped 决策，默认写入 `docs/loopx/runs/<run_id>/artifacts/compound-capture.md`。只有用户确认或项目配置允许时，才写入长期知识库 `docs/loopx/solutions/<category>/<slug>.md`；不得自动修改用户项目的 `AGENTS.md` 或 `CLAUDE.md`。
+经验沉淀是收口辅助能力，不作为正式阶段插入状态机。每次收口前应记录 captured 或 skipped 决策，默认写入 `docs/loopx/runs/<run_id>/artifacts/compound-capture.md`。只有用户确认或项目配置允许时，才写入长期知识库 `docs/loopx/solutions/<category>/<slug>.md`；不得自动修改用户项目的 `AGENTS.md` 或 `CLAUDE.md`。
 
 ## 本地执行硬约束
 
@@ -265,7 +268,7 @@ Compound Capture 是收口辅助能力，不作为正式阶段插入状态机。
 - 并行 worker 必须先声明互不冲突的写入范围；不能让多个 worker 修改同一文件、同一 DTO/API 契约或同一测试类。
 - 最终结论必须区分：`本地通过`、`本地阻塞`、`未覆盖/需 CI 验证`。
 - LLM 审核只是软判断；编译、测试、断言和清理验证才是硬证据。
-- `/health` 是最终完成门：测试执行 `PASS` 后、最终回复前必须运行；结果低于项目可接受标准、命令失败或工具不可用时，最终结论必须写明健康检查失败/未覆盖。
+- `/health` 是最终完成前的必需检查：测试执行 `PASS` 后、最终回复前必须运行；结果低于项目可接受标准、命令失败或工具不可用时，最终结论必须写明健康检查失败/未覆盖。
 - 测试优先使用项目自身工具链；不得为了通过 `/health` 自动安装三方插件或扫描器。
 - 如果方案或测试计划依赖三方工具，必须声明该检查是必需检查还是可选增强检查，并说明缺失时的降级策略。
 - 验证命令优先来自项目 profile；没有匹配 profile 时，必须通过项目发现推断并记录不确定点。

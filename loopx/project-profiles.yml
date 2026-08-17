@@ -2,20 +2,53 @@ profiles:
   java-maven:
     detect:
       - pom.xml
+    rule_sets:
+      - common
+      - architecture
+      - testing
     commands:
-      compile: mvn compile
-      test: mvn test
-      targeted_test: mvn -pl <module-path> -am -Dtest=<TestClass> -DfailIfNoTests=false test
+      compile:
+        argv:
+          - mvn
+          - compile
+        timeout_seconds: 900
+      test:
+        argv:
+          - mvn
+          - test
+        timeout_seconds: 1800
 
   node-pnpm:
     detect:
       - pnpm-lock.yaml
+    rule_sets:
+      - common
+      - architecture
+      - testing
     commands:
-      install_check: pnpm install --frozen-lockfile
-      test: pnpm test
+      install_check:
+        argv:
+          - pnpm
+          - install
+          - --frozen-lockfile
+        timeout_seconds: 900
+      test:
+        argv:
+          - pnpm
+          - test
+        timeout_seconds: 1800
 
   python-pytest:
     detect:
       - pyproject.toml
+    rule_sets:
+      - common
+      - architecture
+      - testing
     commands:
-      test: pytest
+      test:
+        argv:
+          - python3
+          - -m
+          - pytest
+        timeout_seconds: 1800

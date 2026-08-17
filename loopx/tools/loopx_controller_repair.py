@@ -11,6 +11,11 @@ from loopx_controller_contracts import DEFAULT_STAGE_OWNERS, STAGE_SEQUENCE
 from loopx_controller_flow import record_stage_result, stage_index
 from loopx_controller_io import load_state, load_worklist, save_state
 from loopx_controller_state import resolve_run_id, update_worklist_state
+from loopx_controller_policy import is_v2_run
+from loopx_controller_evidence import (
+    resolve_project_file,
+    validate_work_item_references,
+)
 from loopx_controller_tickets import (
     open_repair_tickets_for_stage,
     read_repair_ticket,
@@ -39,6 +44,12 @@ def update_worklist_feedback(project, state, item_id, return_to, reason):
 
 def fail_review(project, run_id, from_stage, return_to, item_id, reasons):
     state = load_state(project, run_id)
+    if is_v2_run(state):
+        try:
+            _, worklist = load_worklist(project, state)
+        except (FileNotFoundError, YamlSubsetError) as exc:
+            raise ValueError(f"无法读取 worklist：{exc}") from exc
+        validate_work_item_references(worklist, [item_id])
     owner = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(return_to, return_to)
     # 按阶段递增返工次数；超过 max_auto_repair 后第 N 次仍失败则 BLOCKED，等待用户处理。
     # ticket.status 只表达票据生命周期（OPEN/CLOSED），阶段结果记录在 stage 状态里。
@@ -77,7 +88,7 @@ def fail_review(project, run_id, from_stage, return_to, item_id, reasons):
         run_id,
         from_stage,
         stage_status,
-        reasons,
+        [] if is_v2_run(state) else reasons,
         return_to=return_to,
         next_action=f"repair_{return_to}",
         affected_work_items=[item_id],
@@ -97,11 +108,11 @@ def cmd_fail_review(args, stdout):
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
-    print(f"{ticket['stage_status']} {args.from_stage}", file=stdout)
-    print(f"repair_ticket: {ticket['item']}", file=stdout)
-    print(f"return_to: {ticket['return_to']}", file=stdout)
-    print(f"assigned_to: {ticket['assigned_to']}", file=stdout)
-    print(f"attempt: {ticket['attempt']}", file=stdout)
+    print(f"{ticket['stage_status']} 审核未通过：{args.from_stage}", file=stdout)
+    print(f"返工单：{ticket['item']}", file=stdout)
+    print(f"返回阶段：{ticket['return_to']}", file=stdout)
+    print(f"负责人：{ticket['assigned_to']}", file=stdout)
+    print(f"尝试次数：{ticket['attempt']}", file=stdout)
     return 0
 
 
@@ -120,18 +131,18 @@ def cmd_claim_stage(args, stdout):
         print(str(exc), file=stdout)
         return 1
     if state.get("current_stage") != args.stage:
-        print(f"FAIL current_stage is {state.get('current_stage')}", file=stdout)
+        print(f"FAIL 当前阶段为 {state.get('current_stage')}，无法领取 {args.stage}", file=stdout)
         return 1
     owner = state.get("stage_owners", DEFAULT_STAGE_OWNERS).get(args.stage, args.stage)
     state["active_agent"] = owner
     save_state(project, run_id, state)
-    print(f"PASS claimed {args.stage}", file=stdout)
-    print(f"assigned_to: {owner}", file=stdout)
+    print(f"PASS 已领取阶段：{args.stage}", file=stdout)
+    print(f"负责人：{owner}", file=stdout)
     for ticket in open_repair_tickets_for_stage(project, run_id, args.stage, state):
-        print(f"repair_ticket: {ticket.get('item')}", file=stdout)
-        print(f"attempt: {ticket.get('attempt')}", file=stdout)
+        print(f"返工单：{ticket.get('item')}", file=stdout)
+        print(f"尝试次数：{ticket.get('attempt')}", file=stdout)
         for change in ticket.get("required_changes", []):
-            print(f"required_change: {change}", file=stdout)
+            print(f"必需修改：{change}", file=stdout)
     return 0
 
 
@@ -140,12 +151,19 @@ def cmd_close_repair(args, stdout):
     try:
         run_id = resolve_run_id(project, args.run_id)
         state = load_state(project, run_id)
+        if is_v2_run(state):
+            try:
+                _, worklist = load_worklist(project, state)
+            except (FileNotFoundError, YamlSubsetError) as exc:
+                raise ValueError(f"无法读取 worklist：{exc}") from exc
+            validate_work_item_references(worklist, [args.item])
+            args.artifact, _ = resolve_project_file(project, args.artifact, "返工产物")
         ticket = read_repair_ticket(project, run_id, args.item, state)
     except ValueError as exc:
         print(str(exc), file=stdout)
         return 1
     if args.revision < 2:
-        print("FAIL repair revision must be >= 2", file=stdout)
+        print("FAIL 返工产物版本必须大于或等于 2", file=stdout)
         return 1
     ticket["status"] = "CLOSED"
     ticket["artifact"] = args.artifact
@@ -158,7 +176,7 @@ def cmd_close_repair(args, stdout):
         # 返工项关闭后重置该阶段的返工计数，允许重新计数自动返工上限。
         state.setdefault("loop_attempts", {}).pop(from_stage, None)
     save_state(project, run_id, state)
-    print(f"PASS repair closed {args.item}", file=stdout)
-    print(f"artifact: {args.artifact}", file=stdout)
-    print(f"revision: {args.revision}", file=stdout)
+    print(f"PASS 已关闭返工单：{args.item}", file=stdout)
+    print(f"产物：{args.artifact}", file=stdout)
+    print(f"版本：{args.revision}", file=stdout)
     return 0

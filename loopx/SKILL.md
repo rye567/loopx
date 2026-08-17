@@ -15,14 +15,14 @@ python loopx/tools/loopx_controller.py init "需求描述" --mode auto --risk-ta
 python loopx/tools/loopx_controller.py status --tracking
 ```
 
-2. 只能用 controller 推进：`interview`、`spec`、`mode --select ...`、`record-stage`、`confirm-stage`、`advance --to ...` 或 `next`；不要手改 `state.json` 伪造 `PASS`。
+2. 只能用 controller 推进：`interview`、`spec`、`import-artifact`、`mode --select ...`、`record-stage`、`confirm-stage`、`advance --to ...` 或 `next`；不要手改逻辑 `state.json` 伪造 `PASS`。
 3. `interview` 必须先把问题展示给用户，并把回答写入 `interview.md`；仍含“待用户回答/未回答”时不得记录 `PASS`。
 4. `solution_review` 未经 `confirm-stage` 变为 `PASS` 前禁止开发；业务写入前必须运行：
 ```bash
 python loopx/tools/loopx_controller.py can-write --kind business
 ```
 
-5. 阶段文档和分析文档写入 `docs/loopx/<date>-<slug>/`；`docs/loopx/runs/<run_id>/` 只存 controller 状态、worklist、events、stage-results 和自动生成 artifact，收口时中间状态（events、repair-tickets）自动归档到 `artifacts/archive/`。
+5. 阶段文档和分析文档写入 `docs/loopx/<date>-<slug>/`；新运行的控制状态默认收纳在用户状态目录的单个 `run.json`，`docs/loopx/runs/<run_id>/...` 只是容器内逻辑路径和旧运行兼容路径。编辑后的运行产物用 `import-artifact` 收纳，结构化产物可用 `record-stage --artifact-file` 直接导入。
 6. Review 不通过或用户指出问题时，必须创建返工任务并回到 owner 阶段：
 
 ```bash
@@ -32,7 +32,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 ```
 
 7. `validate PASS` 只代表结构合法，不代表 LoopX 流程通过；最终放行还需要阶段 `PASS`、写入保护检查、health 检查和未覆盖项说明。
-8. 需求采访和方案审核通过后先落为 `NEED_HUMAN`，用户确认后运行 `confirm-stage --stage requirement_interview`（方案审核对应 `confirm-stage --stage solution_review`）才能继续；实现细节见 `workflow.md`「人工确认门」。可选 Provider 只按 `workflow.md` 的通用契约执行，不得新增阶段或绕过人工门。
+8. 需求采访和方案审核通过后先落为 `NEED_HUMAN`，用户确认后运行 `confirm-stage --stage requirement_interview`（方案审核对应 `confirm-stage --stage solution_review`）才能继续；实现细节见 `workflow.md`「人工确认」。可选 Provider 只按 `workflow.md` 的通用契约执行，不得新增阶段或绕过人工确认。
 
 ## 入口
 
@@ -42,7 +42,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 
 ## 必读资源
 
-- `workflow.md`：完整流程契约。
+- `workflow.md`、`standards/catalog.yml`：完整流程，以及规则标识、适用性、结构化产物和检查方式。
 - `project-harness.md`：项目发现和默认 harness。
 - `risk.yml`、`health.yml`、`project-profiles.yml`：风险、健康检查和 profile 策略。
 - `agents/`、`templates/`、`schemas/`：角色边界、阶段模板和结构契约。
@@ -55,7 +55,7 @@ python loopx/tools/loopx_controller.py close-repair --item W1 --artifact stage-r
 3. 按 `workflow.md` 阶段顺序推进，并在已激活 Provider 订阅的生命周期事件调用它；需求采访必须先向用户提问并等待回答。
 4. 阶段结束写入 `stage-results/*.json`；需求采访和方案审核需要用户确认。
 5. 进入下一阶段前用 `advance --to ...` 或 `next`；最终用 `gate`、`git-gate`、`compound`、`close` 收口。
-6. 收口前记录 Compound Capture：默认只写 run artifact；用户确认或项目配置允许时才写 `docs/loopx/solutions/<category>/<slug>.md`。
+6. 收口前记录经验沉淀决定：默认只写运行产物；用户确认或项目配置允许时才写 `docs/loopx/solutions/<category>/<slug>.md`。
 7. 最终结论区分本地通过、本地阻塞、未覆盖/需 CI 验证，并单列可选 Provider 状态。
 
 ## 状态控制器

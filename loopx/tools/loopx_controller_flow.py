@@ -5,6 +5,7 @@
 不要在命令层绕开这些放行条件。
 """
 
+import copy
 from datetime import datetime
 
 from loopx_controller_artifacts import interview_has_unanswered_placeholders
@@ -18,22 +19,29 @@ from loopx_controller_contracts import (
     STAGE_SEQUENCE,
 )
 from loopx_controller_io import (
+    atomic_write_texts,
     append_event,
+    event_line,
     get_run_dir,
     load_state,
+    load_worklist,
     project_path,
     read_json,
     save_state,
+    json_text,
     write_json,
 )
+from loopx_controller_policy import CONTRACT_VERSION, is_v2_run
 from loopx_controller_state import (
     build_tracking_snapshot,
     interview_state,
     mode_decision_state,
     spec_state,
     update_worklist_state,
+    update_worklist_state_data,
 )
 from loopx_controller_tickets import iter_repair_tickets
+from loopx_controller_yaml import YamlSubsetError, dump_worklist
 
 
 def stage_index(stage):
@@ -72,7 +80,7 @@ def confirmation_next_action(stage):
 
 
 def pending_confirmation_message(stage):
-    return f"{stage} is waiting for user confirmation; run {confirmation_next_action(stage)}"
+    return f"阶段 {stage} 正在等待用户确认；请执行 {confirmation_next_action(stage)}"
 
 
 def is_waiting_confirmation(stage, status):
@@ -106,11 +114,23 @@ def stage_result_next_action(stage, status, stored_status, return_to, next_actio
     return default_next_stage(stage)
 
 
-def build_stage_result(state, stage, agent_result, stored_status, return_to, next_action, evidence, affected_work_items, blocked_reason):
+def build_stage_result(
+    state,
+    stage,
+    agent_result,
+    stored_status,
+    return_to,
+    next_action,
+    evidence,
+    affected_work_items,
+    blocked_reason,
+    artifacts=None,
+    rule_results=None,
+):
     snapshot_state = dict(state)
     snapshot_state["stages"] = dict(state.get("stages", {}))
     snapshot_state["stages"][stage] = stored_status
-    return {
+    result = {
         "stage": stage,
         "status": stored_status,
         "agent_result": agent_result,
@@ -129,19 +149,26 @@ def build_stage_result(state, stage, agent_result, stored_status, return_to, nex
         "user_confirmation_required": stored_status in {"CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN"},
         "blocked_reason": blocked_reason,
     }
+    if is_v2_run(state):
+        result.update({
+            "contract_version": CONTRACT_VERSION,
+            "artifacts": artifacts or [],
+            "rule_results": rule_results or [],
+        })
+    return result
 
 
 def validate_requirement_interview_pass(project, run_id, state):
     interview = state.setdefault("interview", interview_state(run_id))
     artifact = project_path(project, interview.get("artifact"))
     if not artifact.exists():
-        raise ValueError(f"requirement_interview cannot PASS before interview artifact exists: {interview.get('artifact')}")
+        raise ValueError(f"需求采访产物不存在，requirement_interview 不能记录为 PASS：{interview.get('artifact')}")
     try:
         text = artifact.read_text(encoding="utf-8")
     except OSError as exc:
-        raise ValueError(f"requirement_interview artifact cannot be read: {exc}") from exc
+        raise ValueError(f"无法读取 requirement_interview 产物：{exc}") from exc
     if interview_has_unanswered_placeholders(text):
-        raise ValueError("requirement_interview cannot PASS before interview questions are answered")
+        raise ValueError("需求采访问题尚未全部回答，requirement_interview 不能记录为 PASS")
     interview["unanswered_questions"] = 0
     interview["blocking_questions"] = []
 
@@ -178,11 +205,197 @@ def apply_stage_progression(state, stage, status, stored_status, return_to, next
             state["stages"].pop(later_stage, None)
 
 
-def record_stage_result(project, run_id, stage, status, evidence, return_to="", next_action=None, affected_work_items=None, blocked_reason=""):
+def _same_stage_submission(existing, candidate):
+    keys = (
+        "stage",
+        "mode",
+        "agent_result",
+        "status",
+        "return_to",
+        "next_action",
+        "affected_work_items",
+        "evidence",
+        "artifacts",
+        "rule_results",
+        "blocked_reason",
+    )
+    return all(existing.get(key) == candidate.get(key) for key in keys)
+
+
+def record_prepared_v2_stage_result(
+    project,
+    run_id,
+    state,
+    stage,
+    status,
+    prepared,
+    return_to="",
+    next_action=None,
+    affected_work_items=None,
+    blocked_reason="",
+    worklist_path=None,
+    worklist=None,
+    extra_files=None,
+):
+    """把已完成内存校验的 v2 阶段结果和附属文件作为一次提交写入。"""
+
+    directory = get_run_dir(project, run_id)
+    if worklist_path is None or worklist is None:
+        try:
+            worklist_path, worklist = load_worklist(project, state)
+        except (FileNotFoundError, YamlSubsetError) as exc:
+            raise ValueError(f"无法读取 worklist，阶段结果未写入：{exc}") from exc
+    affected_work_items = affected_work_items or []
+    agent_result = status
+    stored_status = stored_stage_status(stage, status)
+    computed_next_action = stage_result_next_action(stage, status, stored_status, return_to, next_action)
+    result = build_stage_result(
+        state,
+        stage,
+        agent_result,
+        stored_status,
+        return_to,
+        computed_next_action,
+        prepared["evidence"],
+        affected_work_items,
+        blocked_reason,
+        artifacts=prepared["artifacts"],
+        rule_results=prepared["rule_results"],
+    )
+    result_path = stage_result_path(directory, stage)
+    if result_path.exists():
+        existing = read_json(result_path)
+        worklist_stage = next(
+            (item for item in worklist.get("stages") or [] if item.get("stage") == stage),
+            {},
+        )
+        if (
+            _same_stage_submission(existing, result)
+            and state.get("stages", {}).get(stage) == stored_status
+            and worklist_stage.get("status") == stored_status
+        ):
+            return existing
+
+    new_state = copy.deepcopy(state)
+    new_state.setdefault("stages", {})[stage] = stored_status
+    apply_stage_metadata(new_state, run_id, stage, status, stored_status)
+    apply_stage_progression(new_state, stage, status, stored_status, return_to, computed_next_action)
+    new_worklist = copy.deepcopy(worklist)
+    if prepared["solution_items"] is not None:
+        new_worklist["items"] = prepared["solution_items"]
+    if stage == "development" and status == "PASS":
+        affected = set(affected_work_items)
+        for item in new_worklist.get("items") or []:
+            if item.get("id") not in affected:
+                continue
+            item["status"] = "PASS"
+            item["evidence"] = list(prepared["evidence"])
+            item["failed_by"] = ""
+            item["return_to"] = ""
+            item["required_changes"] = []
+    update_worklist_state_data(new_worklist, new_state, stage, stored_status)
+
+    events_path = directory / "events.jsonl"
+    try:
+        old_events = events_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        old_events = ""
+    new_event = event_line({
+        "type": "stage_recorded",
+        "stage": stage,
+        "status": stored_status,
+        "agent_result": agent_result,
+        "return_to": return_to,
+    })
+    files = dict(extra_files or {})
+    files.update({
+        result_path: json_text(result),
+        directory / "state.json": json_text(new_state),
+        worklist_path: dump_worklist(new_worklist),
+        events_path: old_events + new_event,
+    })
+    atomic_write_texts(files)
+    return result
+
+
+def _record_v2_stage_result(
+    project,
+    run_id,
+    state,
+    stage,
+    status,
+    evidence,
+    artifacts,
+    return_to,
+    next_action,
+    affected_work_items,
+    blocked_reason,
+):
+    # 延迟导入避免 evidence -> policy/io 与 flow 的模块初始化形成环。
+    from loopx_controller_evidence import prepare_v2_stage_record
+
+    directory = get_run_dir(project, run_id)
+    try:
+        worklist_path, worklist = load_worklist(project, state)
+    except (FileNotFoundError, YamlSubsetError) as exc:
+        raise ValueError(f"无法读取 worklist，阶段结果未写入：{exc}") from exc
+    affected_work_items = affected_work_items or []
+    prepared = prepare_v2_stage_record(
+        project,
+        state,
+        stage,
+        status,
+        evidence,
+        artifacts,
+        affected_work_items,
+        worklist,
+    )
+    return record_prepared_v2_stage_result(
+        project,
+        run_id,
+        state,
+        stage,
+        status,
+        prepared,
+        return_to=return_to,
+        next_action=next_action,
+        affected_work_items=affected_work_items,
+        blocked_reason=blocked_reason,
+        worklist_path=worklist_path,
+        worklist=worklist,
+    )
+
+
+def record_stage_result(
+    project,
+    run_id,
+    stage,
+    status,
+    evidence,
+    return_to="",
+    next_action=None,
+    affected_work_items=None,
+    blocked_reason="",
+    artifacts=None,
+):
     directory = get_run_dir(project, run_id)
     state = load_state(project, run_id)
     if stage == "requirement_interview" and status == "PASS":
         validate_requirement_interview_pass(project, run_id, state)
+    if is_v2_run(state):
+        return _record_v2_stage_result(
+            project,
+            run_id,
+            state,
+            stage,
+            status,
+            evidence,
+            artifacts or {},
+            return_to,
+            next_action,
+            affected_work_items,
+            blocked_reason,
+        )
     agent_result = status
     stored_status = stored_stage_status(stage, status)
     computed_next_action = stage_result_next_action(stage, status, stored_status, return_to, next_action)
@@ -222,10 +435,10 @@ def advance_blockers(project, run_id, state, target_stage):
     for ticket in iter_repair_tickets(project, run_id, state):
         return_to = ticket.get("return_to")
         if ticket.get("status") == "OPEN" and return_to in STAGES and stage_index(return_to) < stage_index(target_stage):
-            blockers.append(f"repair ticket {ticket.get('item')} must be CLOSED before {target_stage}")
+            blockers.append(f"进入 {target_stage} 前必须关闭返工单 {ticket.get('item')}")
     changed = first_changes_required(stages)
     if changed:
-        blockers.append(f"{changed} is {stages[changed]}; return before advancing")
+        blockers.append(f"阶段 {changed} 状态为 {stages[changed]}，推进前必须返回处理")
     for stage in stages_before(target_stage):
         status = stages.get(stage)
         if is_waiting_confirmation(stage, status):
@@ -235,14 +448,14 @@ def advance_blockers(project, run_id, state, target_stage):
             continue
         if status == "SKIPPED" and stage_can_be_skipped(stage, state):
             continue
-        blockers.append(f"{stage} must be PASS before {target_stage}")
+        blockers.append(f"进入 {target_stage} 前，阶段 {stage} 必须为 PASS")
     return blockers
 
 
 def business_write_blockers(state, project=None, run_id=None):
     blockers = []
     if state.get("current_stage") != "development":
-        blockers.append("current_stage must be development")
+        blockers.append("当前阶段必须为 development")
     stages = state.get("stages", {})
     for stage in ("solution_review", "test_review"):
         status = stages.get(stage)
@@ -251,17 +464,17 @@ def business_write_blockers(state, project=None, run_id=None):
         elif status not in PASSING_STATUSES and not (
             status == "SKIPPED" and stage_can_be_skipped(stage, state)
         ):
-            blockers.append(f"{stage} must be PASS before business writes")
+            blockers.append(f"写入业务文件前，阶段 {stage} 必须为 PASS")
     # BLOCKED 始终锁定写入：它表示等待人工处理，不属于自动返工路径。
     blocked = first_stage_with_status(stages, "BLOCKED")
     if blocked:
-        blockers.append(f"{blocked} is BLOCKED")
+        blockers.append(f"阶段 {blocked} 状态为 BLOCKED")
     # CHANGES_REQUIRED 若存在指向 development 的开放返工单，是返工信号而非阻塞：
     # 开发必须能修改代码来修复该阶段，否则状态机自我死锁（修复必须先过 can-write，
     # 而 can-write 又因待修复的 CHANGES_REQUIRED 拒绝写入）。
     changed = first_stage_with_status(stages, "CHANGES_REQUIRED")
     if changed and not has_open_dev_repair_ticket(project, run_id, state):
-        blockers.append(f"{changed} is {stages[changed]}")
+        blockers.append(f"阶段 {changed} 状态为 {stages[changed]}")
     return blockers
 
 
@@ -286,16 +499,26 @@ def apply_confirmation_result(result, state, stage, confirmation):
 
 def confirm_stage(project, run_id, stage, evidence, confirmed_by):
     if stage not in CONFIRMATION_GATE_STAGES:
-        raise ValueError(f"{stage} is not a user confirmation gate")
+        raise ValueError(f"阶段 {stage} 不需要用户确认")
     directory = get_run_dir(project, run_id)
     state = load_state(project, run_id)
     current_status = state.get("stages", {}).get(stage)
     if current_status != "NEED_HUMAN":
-        raise ValueError(f"{stage} must be NEED_HUMAN before confirmation")
+        raise ValueError(f"确认前，阶段 {stage} 必须为 NEED_HUMAN")
     result_path = stage_result_path(directory, stage)
     result = read_json(result_path)
     if result.get("status") != "NEED_HUMAN":
-        raise ValueError(f"{result_path.name} must be NEED_HUMAN before confirmation")
+        raise ValueError(f"确认前，{result_path.name} 的状态必须为 NEED_HUMAN")
+    if is_v2_run(state):
+        # v2 的用户确认同样属于可复核证据，不能退回 v1 的自由文本语义。
+        from loopx_controller_evidence import resolve_project_file
+
+        evidence = [
+            resolve_project_file(project, raw, "用户确认凭据")[0]
+            for raw in evidence
+        ]
+        if not evidence:
+            raise ValueError("v2 用户确认必须提供至少一个有效证据文件")
     confirmation = build_confirmation(evidence, confirmed_by)
     state.setdefault("stages", {})[stage] = "PASS"
     state.setdefault("confirmations", {})[stage] = confirmation

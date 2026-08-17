@@ -26,18 +26,25 @@ from loopx_controller_flow import stage_can_be_skipped, stage_result_path
 from loopx_controller_io import (
     get_run_dir,
     load_schema,
+    project_path,
     read_json,
     validate_schema,
 )
 from loopx_controller_state import mode_rank
 from loopx_controller_yaml import YamlSubsetError, parse_yaml_subset
+from loopx_controller_policy import is_v2_run, load_policy_snapshot
 
 
 def strict_validation_errors(project, run_id, state, worklist):
     errors = []
+    if is_v2_run(state):
+        try:
+            load_policy_snapshot(project, state)
+        except ValueError as exc:
+            errors.append(str(exc))
     for key in ("interview", "spec", "mode_decision", "tracking", "git_gate"):
         if key not in state or state[key] is None:
-            errors.append(f"state.{key} is required for strict validation")
+            errors.append(f"严格检查要求 state.{key} 存在")
     if errors:
         return errors
     for state_key, schema_name in (
@@ -50,32 +57,32 @@ def strict_validation_errors(project, run_id, state, worklist):
 
     mode_decision = state.get("mode_decision", {})
     if not mode_decision.get("recommended"):
-        errors.append("state.mode_decision.recommended is required for strict validation")
+        errors.append("严格检查要求 state.mode_decision.recommended 存在")
     if not mode_decision.get("selected"):
-        errors.append("state.mode_decision.selected is required for strict validation")
+        errors.append("严格检查要求 state.mode_decision.selected 存在")
     if mode_decision.get("selection_status") != "CONFIRMED":
-        errors.append("state.mode_decision.selection_status must be CONFIRMED for strict validation")
+        errors.append("严格检查要求 state.mode_decision.selection_status 为 CONFIRMED")
     if mode_rank(mode_decision.get("recommended")) > mode_rank(mode_decision.get("selected")):
         accepted = mode_decision.get("accepted_risk", {})
         if not accepted.get("selected_lower_than_recommended") or not accepted.get("reason"):
-            errors.append("state.mode_decision.accepted_risk.reason is required when selected mode is lower than recommended")
+            errors.append("所选执行等级低于建议等级时，必须填写 state.mode_decision.accepted_risk.reason")
     # SKIPPED 只能出现在该模式允许跳过的阶段（MODE_SKIPPABLE_STAGES 为唯一事实源）。
     skippable = MODE_SKIPPABLE_STAGES.get(state.get("mode", ""), frozenset())
     for stage, status in state.get("stages", {}).items():
         if status == "SKIPPED" and stage not in skippable:
-            errors.append(f"{stage} cannot be SKIPPED in {state.get('mode')} mode")
+            errors.append(f"{state.get('mode')} 执行等级不允许将阶段 {stage} 设为 SKIPPED")
     if state.get("stages", {}).get("final_report") == "PASS":
         # final_report 是收口入口，必须同时有发布准备、Git 摘要和复利沉淀决策。
         release_status = state.get("stages", {}).get("release_readiness")
         if release_status not in PASSING_STATUSES and not (
             release_status == "SKIPPED" and stage_can_be_skipped("release_readiness", state)
         ):
-            errors.append("release_readiness must be PASS before final_report PASS")
+            errors.append("final_report 记录为 PASS 前，release_readiness 必须为 PASS")
         git_gate = state.get("git_gate", {})
         if git_gate.get("status") != "PASS":
-            errors.append("state.git_gate.status must be PASS before final_report PASS")
+            errors.append("final_report 记录为 PASS 前，state.git_gate.status 必须为 PASS")
         if not git_gate.get("diff_summary"):
-            errors.append("state.git_gate.diff_summary is required for final_report PASS")
+            errors.append("final_report 记录为 PASS 前，必须填写 state.git_gate.diff_summary")
         errors.extend(validate_compound_capture(project, state.get("compound_capture", {}), load_schema("compound-learning"), validate_schema))
 
     worklist_stages = worklist.get("stages") or []
@@ -83,13 +90,13 @@ def strict_validation_errors(project, run_id, state, worklist):
     seen = set(worklist_by_stage)
     for stage in STAGE_SEQUENCE:
         if stage not in seen:
-            errors.append(f"worklist.stages must include {stage}")
+            errors.append(f"worklist.stages 必须包含 {stage}")
     if worklist.get("run", {}).get("current_stage") != state.get("current_stage"):
-        errors.append("worklist.run.current_stage must match state.current_stage")
+        errors.append("worklist.run.current_stage 必须与 state.current_stage 一致")
     for stage, status in state.get("stages", {}).items():
         worklist_stage = worklist_by_stage.get(stage)
         if worklist_stage and worklist_stage.get("status") != status:
-            errors.append(f"worklist.stages[{stage}].status must match state.stages.{stage}")
+            errors.append(f"worklist.stages[{stage}].status 必须与 state.stages.{stage} 一致")
 
     directory = get_run_dir(project, run_id)
     for stage, status in state.get("stages", {}).items():
@@ -97,59 +104,66 @@ def strict_validation_errors(project, run_id, state, worklist):
             continue
         result_path = stage_result_path(directory, stage)
         if not result_path.exists():
-            errors.append(f"{stage} is {status} but {result_path.name} is missing")
+            errors.append(f"阶段 {stage} 为 {status}，但缺少 {result_path.name}")
             continue
         try:
             result = read_json(result_path)
         except ValueError as exc:
             errors.append(str(exc))
             continue
+        if is_v2_run(state):
+            try:
+                from loopx_controller_evidence import validate_recorded_v2_stage
+
+                validate_recorded_v2_stage(project, state, stage, result, worklist)
+            except ValueError as exc:
+                errors.append(f"阶段 {stage} 的 v2 证据复核失败：{exc}")
         if not result.get("tracking_snapshot"):
-            errors.append(f"{result_path.name}.tracking_snapshot is required for strict validation")
+            errors.append(f"严格检查要求 {result_path.name}.tracking_snapshot 存在")
         else:
             snapshot_stages = {item.get("stage") for item in result.get("tracking_snapshot", []) if isinstance(item, dict)}
             if snapshot_stages != set(STAGE_SEQUENCE):
-                errors.append(f"{result_path.name}.tracking_snapshot must include all LoopX stages")
+                errors.append(f"{result_path.name}.tracking_snapshot 必须包含全部 LoopX 阶段")
         if stage in CONFIRMATION_GATE_STAGES and status == "PASS":
             if (
                 not result.get("confirmed_by")
                 or not result.get("confirmed_at")
                 or not result.get("confirmation_evidence")
             ):
-                errors.append(f"{stage} PASS requires confirmation metadata")
+                errors.append(f"阶段 {stage} 记录为 PASS 时必须包含确认信息")
 
     for stage, key in (("requirement_interview", "interview"), ("spec_review", "spec")):
         if state.get("stages", {}).get(stage) in PASSING_STATUSES:
             artifact = Path(state.get(key, {}).get("artifact", ""))
             if not artifact.is_absolute():
-                artifact = project / artifact
+                artifact = project_path(project, artifact)
             if not artifact.exists():
-                errors.append(f"state.{key}.artifact does not exist for PASS {stage}")
+                errors.append(f"阶段 {stage} 已通过，但 state.{key}.artifact 指向的文件不存在")
                 continue
             if stage == "requirement_interview" and state.get("interview", {}).get("unanswered_questions", 0) != 0:
-                errors.append("state.interview.unanswered_questions must be 0 for PASS requirement_interview")
+                errors.append("requirement_interview 已通过时，state.interview.unanswered_questions 必须为 0")
             if stage == "requirement_interview":
                 try:
                     text = artifact.read_text(encoding="utf-8")
                 except OSError as exc:
-                    errors.append(f"state.interview.artifact cannot be read: {exc}")
+                    errors.append(f"无法读取 state.interview.artifact：{exc}")
                     continue
                 if interview_has_unanswered_placeholders(text):
-                    errors.append("interview.md still contains unanswered placeholders")
+                    errors.append("interview.md 仍包含未回答占位内容")
             if stage == "spec_review":
                 try:
                     text = artifact.read_text(encoding="utf-8")
                 except OSError as exc:
-                    errors.append(f"state.spec.artifact cannot be read: {exc}")
+                    errors.append(f"无法读取 state.spec.artifact：{exc}")
                     continue
                 for section in missing_spec_sections(text):
-                    errors.append(f"spec.md missing required section: {section}")
+                    errors.append(f"spec.md 缺少必需章节：{section}")
                 for section in empty_spec_sections(text):
-                    errors.append(f"spec.md required section is empty: {section}")
+                    errors.append(f"spec.md 的必需章节为空：{section}")
     if state.get("stages", {}).get("final_report") == "PASS" and (state.get("mode") == "FULL" or mode_decision.get("selected") == "FULL"):
         for stage in FULL_REQUIRED_PASS_STAGES:
             if state.get("stages", {}).get(stage) not in PASSING_STATUSES:
-                errors.append(f"FULL mode requires {stage} PASS before final_report PASS")
+                errors.append(f"FULL 执行等级要求阶段 {stage} 在 final_report 通过前为 PASS")
     return errors
 
 
@@ -164,27 +178,27 @@ def validate_run(project, run_id, strict=False):
 
     errors.extend(validate_schema(state, load_schema("state")))
     if state.get("run_id") != run_id:
-        errors.append("state.run_id must match selected run")
+        errors.append("state.run_id 必须与所选运行一致")
     if state.get("current_stage") and state["current_stage"] not in STAGES:
-        errors.append("current_stage is not a known LoopX stage")
+        errors.append("current_stage 不是已知的 LoopX 阶段")
     for stage, status in state.get("stages", {}).items():
         if stage not in STAGES:
-            errors.append(f"stages.{stage} is not a known LoopX stage")
+            errors.append(f"stages.{stage} 不是已知的 LoopX 阶段")
         if status not in STAGE_STATUSES:
-            errors.append(f"stages.{stage} has invalid status {status}")
+            errors.append(f"stages.{stage} 的状态无效：{status}")
 
     worklist_rel = state.get("worklist") or f"docs/loopx/runs/{run_id}/worklist.yml"
     worklist_path = Path(worklist_rel)
     if not worklist_path.is_absolute():
-        worklist_path = project / worklist_path
+        worklist_path = project_path(project, worklist_path)
     worklist = None
     try:
         worklist = parse_yaml_subset(worklist_path.read_text(encoding="utf-8"))
         errors.extend(validate_schema(worklist, load_schema("worklist")))
     except FileNotFoundError:
-        errors.append(f"{worklist_path} does not exist")
+        errors.append(f"工作清单不存在：{worklist_path}")
     except YamlSubsetError as exc:
-        errors.append(f"{worklist_path} is not valid LoopX YAML: {exc}")
+        errors.append(f"工作清单不是有效的 LoopX YAML：{worklist_path}：{exc}")
 
     stage_result_root = directory / "stage-results"
     if stage_result_root.exists():

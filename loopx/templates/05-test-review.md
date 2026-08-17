@@ -12,7 +12,7 @@
 
 ```yaml
 stage_result:
-  stage: "05 测试用例审核"
+  stage: test_review
   status: PASS|CHANGES_REQUIRED|BLOCKED|ACCEPTED_RISK
   return_to:
   next_action: development
@@ -22,7 +22,7 @@ stage_result:
   blocked_reason:
 ```
 
-## Evidence
+## 证据
 
 | 类型 | 命令/文件 | 结果 | 说明 |
 |---|---|---|---|

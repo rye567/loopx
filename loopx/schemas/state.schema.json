@@ -13,6 +13,19 @@
     "stages"
   ],
   "properties": {
+    "contract_version": {
+      "type": "string",
+      "enum": ["1", "2"]
+    },
+    "catalog_version": {
+      "type": "string"
+    },
+    "policy_snapshot": {
+      "type": "string"
+    },
+    "policy_snapshot_sha256": {
+      "type": "string"
+    },
     "run_id": {
       "type": "string"
     },
@@ -76,6 +89,9 @@
       "type": "object"
     },
     "compound_capture": {
+      "type": "object"
+    },
+    "health": {
       "type": "object"
     },
     "stages": {

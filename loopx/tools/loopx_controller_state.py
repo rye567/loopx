@@ -15,6 +15,7 @@ from loopx_controller_contracts import (
     STAGE_SEQUENCE,
 )
 from loopx_controller_io import load_worklist, loopx_root, run_root
+from loopx_controller_store import external_runs
 from loopx_controller_yaml import YamlSubsetError, dump_worklist, parse_yaml_subset, yaml_string
 
 
@@ -63,25 +64,38 @@ items: []
 """
 
 
-def risk_config():
+def risk_config(project=None):
+    if project is not None:
+        local = project / "loopx" / "risk.yml"
+        if local.is_file():
+            return parse_yaml_subset(local.read_text(encoding="utf-8"))
     return parse_yaml_subset((loopx_root() / "risk.yml").read_text(encoding="utf-8"))
 
 
-def resolve_mode(mode, risk_tags):
+def resolve_mode(mode, risk_tags, project=None):
     if mode != "auto":
         return mode
-    config = risk_config()
+    config = risk_config(project)
     critical = set(config.get("critical_triggers", []))
     score_rules = config.get("score_rules", {})
     thresholds = config.get("thresholds", {})
     if critical.intersection(risk_tags):
-        return "FULL"
-    score = sum(int(score_rules.get(tag, 0)) for tag in risk_tags)
-    if score >= int(thresholds.get("full_min", 6)):
-        return "FULL"
-    if score <= int(thresholds.get("light_max", 1)):
-        return "LIGHT"
-    return "STANDARD"
+        selected = "FULL"
+    else:
+        score = sum(int(score_rules.get(tag, 0)) for tag in risk_tags)
+        if score >= int(thresholds.get("full_min", 6)):
+            selected = "FULL"
+        elif score <= int(thresholds.get("light_max", 1)):
+            selected = "LIGHT"
+        else:
+            selected = "STANDARD"
+    ranks = {"LIGHT": 1, "STANDARD": 2, "FULL": 3}
+    profiles = config.get("risk_profiles") or {}
+    for tag in risk_tags:
+        minimum = (profiles.get(tag) or {}).get("minimum_mode")
+        if ranks.get(minimum, 0) > ranks[selected]:
+            selected = minimum
+    return selected
 
 
 def mode_rank(mode):
@@ -132,7 +146,15 @@ def update_worklist_state(project, state, stage=None, stage_status=None):
         worklist_path, worklist = load_worklist(project, state)
     except (FileNotFoundError, YamlSubsetError):
         return
+    update_worklist_state_data(worklist, state, stage, stage_status)
+    worklist_path.write_text(dump_worklist(worklist), encoding="utf-8")
+
+
+def update_worklist_state_data(worklist, state, stage=None, stage_status=None):
+    """只更新内存中的 worklist；v2 用它在统一提交前完成全部计算。"""
+
     worklist.setdefault("run", {})["current_stage"] = state.get("current_stage")
+    worklist["run"]["mode"] = state.get("mode", "")
     worklist["run"]["next_action"] = state.get("next_action", "")
     if "spec" in state:
         worklist["spec"] = {
@@ -158,7 +180,7 @@ def update_worklist_state(project, state, stage=None, stage_status=None):
                 if not artifact and stage in STAGE_RESULT_FILES:
                     artifact = f"docs/loopx/runs/{state.get('run_id')}/stage-results/{STAGE_RESULT_FILES[stage]}"
                 item["evidence"] = artifact or item.get("evidence", "")
-    worklist_path.write_text(dump_worklist(worklist), encoding="utf-8")
+    return worklist
 
 
 def build_tracking_snapshot(state):
@@ -198,12 +220,13 @@ def format_tracking(state):
 
 def latest_run_id(project):
     root = run_root(project)
-    if not root.exists():
+    candidates = []
+    if root.exists():
+        candidates.extend((path.name, path.stat().st_mtime) for path in root.iterdir() if path.is_dir())
+    candidates.extend(external_runs(project))
+    if not candidates:
         return None
-    runs = [path for path in root.iterdir() if path.is_dir()]
-    if not runs:
-        return None
-    return max(runs, key=lambda path: path.stat().st_mtime).name
+    return max(candidates, key=lambda item: item[1])[0]
 
 
 def resolve_run_id(project, run_id):
@@ -211,5 +234,5 @@ def resolve_run_id(project, run_id):
         return run_id
     resolved = latest_run_id(project)
     if not resolved:
-        raise ValueError("no LoopX runs found")
+        raise ValueError("没有可用的 LoopX 运行记录")
     return resolved

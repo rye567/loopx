@@ -1,11 +1,13 @@
 import importlib.util
 import io
 import json
+import os
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,8 +23,32 @@ def load_controller_module():
 
 class LoopxControllerTest(unittest.TestCase):
     def setUp(self):
+        self.backend_patch = mock.patch.dict(os.environ, {"LOOPX_STATE_BACKEND": "project"})
+        self.backend_patch.start()
+        self.addCleanup(self.backend_patch.stop)
         self.controller = load_controller_module()
         self.tmp = Path(tempfile.mkdtemp(prefix="loopx-controller-test-"))
+        # 既有控制器测试固定覆盖“无 contract_version 的历史运行”。新建 v2
+        # 运行及结构化证据行为由 test_loopx_evidence.py 单独覆盖。
+        original_main = self.controller.main
+
+        def legacy_main(argv=None, stdout=None):
+            code = original_main(argv, stdout)
+            if code == 0 and argv and argv[0] == "init":
+                run_id = argv[argv.index("--run-id") + 1]
+                run_dir = self.run_dir(run_id)
+                state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+                for key in ("contract_version", "catalog_version", "policy_snapshot", "policy_snapshot_sha256"):
+                    state.pop(key, None)
+                (run_dir / "state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+                environment = run_dir / "stage-results" / "00-environment-check.json"
+                result = json.loads(environment.read_text(encoding="utf-8"))
+                for key in ("contract_version", "artifacts", "rule_results"):
+                    result.pop(key, None)
+                environment.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+            return code
+
+        self.controller.main = legacy_main
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -127,7 +153,7 @@ class LoopxControllerTest(unittest.TestCase):
         self.assertTrue((run_dir / "worklist.yml").exists())
         self.assertTrue((run_dir / "artifacts" / "repair-tickets").exists())
         self.assertTrue((run_dir / "events.jsonl").exists())
-        self.assertIn("created run 2026-05-15-controller", out.getvalue())
+        self.assertIn("PASS 已创建运行：2026-05-15-controller", out.getvalue())
 
     def test_init_creates_interview_spec_mode_and_tracking_metadata(self):
         out = io.StringIO()
@@ -189,7 +215,7 @@ class LoopxControllerTest(unittest.TestCase):
         self.assertEqual(state["mode_decision"]["selected"], "")
         self.assertEqual(state["mode_decision"]["selection_status"], "NEED_HUMAN")
         self.assertEqual(state["risk_tags"], ["tenant_scope", "core_state_transition", "api_contract"])
-        self.assertIn("recommended mode: FULL", out.getvalue())
+        self.assertIn("建议执行等级：FULL", out.getvalue())
 
     def test_init_explicit_mode_confirms_user_selection(self):
         out = io.StringIO()
@@ -246,7 +272,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("items[0].owner_agent is required", out.getvalue())
+        self.assertIn("items[0].owner_agent 为必填项", out.getvalue())
 
     def test_status_uses_latest_run_when_run_id_is_omitted(self):
         self.controller.main([
@@ -263,8 +289,8 @@ items:
 
         self.assertEqual(code, 0)
         text = out.getvalue()
-        self.assertIn("run_id: status-run", text)
-        self.assertIn("current_stage: requirement_intake", text)
+        self.assertIn("运行 ID：status-run", text)
+        self.assertIn("当前阶段：requirement_intake", text)
 
     def test_status_tracking_outputs_full_stage_list(self):
         self.controller.main([
@@ -324,7 +350,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("01-requirement-intake.json.evidence is required", out.getvalue())
+        self.assertIn("01-requirement-intake.json.evidence 为必填项", out.getvalue())
 
     def test_strict_validate_rejects_missing_interview_spec_mode_or_tracking_metadata(self):
         self.controller.main([
@@ -350,7 +376,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("state.interview is required for strict validation", out.getvalue())
+        self.assertIn("严格检查要求 state.interview 存在", out.getvalue())
 
     def test_strict_validate_applies_front_gate_schemas(self):
         self.controller.main([
@@ -379,8 +405,8 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("state.interview.artifact is required", out.getvalue())
-        self.assertIn("state.tracking.worklist must be string", out.getvalue())
+        self.assertIn("state.interview.artifact 为必填项", out.getvalue())
+        self.assertIn("state.tracking.worklist 必须是 string", out.getvalue())
 
     def test_gate_command_runs_strict_validation(self):
         self.controller.main([
@@ -403,8 +429,8 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        self.assertIn("PASS gate gate-run", out.getvalue())
-        self.assertIn("strict validation", out.getvalue())
+        self.assertIn("PASS 流程检查通过：gate-run", out.getvalue())
+        self.assertIn("严格检查", out.getvalue())
 
         run_dir = self.tmp / "docs" / "loopx" / "runs" / "gate-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
@@ -420,8 +446,8 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("FAIL gate gate-run", out.getvalue())
-        self.assertIn("state.tracking is required for strict validation", out.getvalue())
+        self.assertIn("FAIL 流程检查未通过：gate-run", out.getvalue())
+        self.assertIn("严格检查要求 state.tracking 存在", out.getvalue())
 
     def test_strict_validate_requires_git_gate_metadata(self):
         self.controller.main([
@@ -447,7 +473,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("state.git_gate is required for strict validation", out.getvalue())
+        self.assertIn("严格检查要求 state.git_gate 存在", out.getvalue())
 
     def test_strict_validate_rejects_skipped_full_mode_required_stages(self):
         self.controller.main([
@@ -477,9 +503,9 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("solution_review cannot be SKIPPED in FULL mode", out.getvalue())
-        self.assertIn("test_review cannot be SKIPPED in FULL mode", out.getvalue())
-        self.assertIn("health_gate cannot be SKIPPED in FULL mode", out.getvalue())
+        self.assertIn("FULL 执行等级不允许将阶段 solution_review 设为 SKIPPED", out.getvalue())
+        self.assertIn("FULL 执行等级不允许将阶段 test_review 设为 SKIPPED", out.getvalue())
+        self.assertIn("FULL 执行等级不允许将阶段 health_gate 设为 SKIPPED", out.getvalue())
 
     def test_strict_validate_rejects_interview_pass_with_unanswered_questions(self):
         self.controller.main([
@@ -510,7 +536,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("state.interview.unanswered_questions must be 0 for PASS requirement_interview", out.getvalue())
+        self.assertIn("requirement_interview 已通过时，state.interview.unanswered_questions 必须为 0", out.getvalue())
 
     def test_strict_validate_rejects_interview_pass_with_unanswered_placeholders(self):
         self.controller.main([
@@ -541,7 +567,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("interview.md still contains unanswered placeholders", out.getvalue())
+        self.assertIn("interview.md 仍包含未回答占位内容", out.getvalue())
 
     def test_strict_validate_rejects_spec_review_pass_with_missing_required_sections(self):
         self.controller.main([
@@ -581,8 +607,8 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("spec.md missing required section: Acceptance Criteria", out.getvalue())
-        self.assertIn("spec.md missing required section: Test Strategy", out.getvalue())
+        self.assertIn("spec.md 缺少必需章节：Acceptance Criteria", out.getvalue())
+        self.assertIn("spec.md 缺少必需章节：Test Strategy", out.getvalue())
 
     def test_strict_validate_rejects_spec_review_pass_with_empty_required_sections(self):
         self.controller.main([
@@ -651,8 +677,8 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("spec.md required section is empty: Acceptance Criteria", out.getvalue())
-        self.assertIn("spec.md required section is empty: Test Strategy", out.getvalue())
+        self.assertIn("spec.md 的必需章节为空：Acceptance Criteria", out.getvalue())
+        self.assertIn("spec.md 的必需章节为空：Test Strategy", out.getvalue())
 
     def test_strict_validate_rejects_final_report_pass_without_git_gate_and_diff_summary(self):
         self.controller.main([
@@ -689,8 +715,8 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("state.git_gate.status must be PASS before final_report PASS", out.getvalue())
-        self.assertIn("state.git_gate.diff_summary is required for final_report PASS", out.getvalue())
+        self.assertIn("final_report 记录为 PASS 前，state.git_gate.status 必须为 PASS", out.getvalue())
+        self.assertIn("final_report 记录为 PASS 前，必须填写 state.git_gate.diff_summary", out.getvalue())
 
         run_dir = self.tmp / "docs" / "loopx" / "runs" / "strict-final-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
@@ -722,7 +748,7 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("state.compound_capture.decision must be captured or skipped before final_report PASS", out.getvalue())
+        self.assertIn("final_report 记录为 PASS 前，state.compound_capture.decision 必须为 captured 或 skipped", out.getvalue())
 
         self.controller.main([
             "compound",
@@ -769,7 +795,7 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        self.assertIn("PASS git gate git-gate-run", out.getvalue())
+        self.assertIn("PASS Git 变更检查通过：git-gate-run", out.getvalue())
         state = json.loads((self.tmp / "docs" / "loopx" / "runs" / "git-gate-run" / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["git_gate"]["status"], "PASS")
         self.assertIn("tracked-change.txt", state["git_gate"]["diff_summary"])
@@ -795,7 +821,7 @@ LIGHT.
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("NEED_HUMAN git gate git-gate-no-repo-run", out.getvalue())
+        self.assertIn("NEED_HUMAN Git 变更检查需要用户处理：git-gate-no-repo-run", out.getvalue())
         state = json.loads((self.tmp / "docs" / "loopx" / "runs" / "git-gate-no-repo-run" / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["git_gate"]["status"], "NEED_HUMAN")
 
@@ -831,8 +857,8 @@ LIGHT.
         self.assertEqual(state["compound_capture"]["artifact"], "docs/loopx/runs/compound-skip-run/artifacts/compound-capture.md")
         self.assertEqual(state["compound_capture"]["project_doc"], "")
         self.assertFalse((self.tmp / "docs" / "loopx" / "solutions").exists())
-        self.assertIn("PASS compound capture compound-skip-run", out.getvalue())
-        self.assertIn("decision: skipped", out.getvalue())
+        self.assertIn("PASS 已记录经验沉淀决定：compound-skip-run", out.getvalue())
+        self.assertIn("决定：skipped", out.getvalue())
 
     def test_compound_writes_project_learning_doc_when_explicitly_enabled(self):
         self.controller.main([
@@ -881,10 +907,10 @@ LIGHT.
         self.assertIn("  - api_contract", text)
         self.assertIn("applies_to:", text)
         self.assertIn("  - loopx/tools", text)
-        self.assertIn("## Learning", text)
+        self.assertIn("## 经验", text)
         self.assertEqual(state["compound_capture"]["decision"], "captured")
         self.assertEqual(state["compound_capture"]["project_doc"], "docs/loopx/solutions/workflow/interview-gate-requires-answered-artifact.md")
-        self.assertIn("project_doc: docs/loopx/solutions/workflow/interview-gate-requires-answered-artifact.md", out.getvalue())
+        self.assertIn("项目文档：docs/loopx/solutions/workflow/interview-gate-requires-answered-artifact.md", out.getvalue())
 
     def test_validate_learning_rejects_missing_required_frontmatter(self):
         bad_doc = self.tmp / "bad-learning.md"
@@ -905,9 +931,9 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("FAIL learning", out.getvalue())
-        self.assertIn("frontmatter.title is required", out.getvalue())
-        self.assertIn("frontmatter.summary is required", out.getvalue())
+        self.assertIn("FAIL 经验文档检查未通过", out.getvalue())
+        self.assertIn("frontmatter.title 为必填项", out.getvalue())
+        self.assertIn("frontmatter.summary 为必填项", out.getvalue())
 
     def test_strict_validate_rejects_worklist_stage_status_drift(self):
         self.controller.main([
@@ -949,7 +975,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("worklist.stages[solution_design].status must match state.stages.solution_design", out.getvalue())
+        self.assertIn("worklist.stages[solution_design].status 必须与 state.stages.solution_design 一致", out.getvalue())
 
     def test_strict_validate_rejects_final_report_pass_when_full_required_stages_are_missing(self):
         self.controller.main([
@@ -987,8 +1013,8 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("FULL mode requires solution_review PASS before final_report PASS", out.getvalue())
-        self.assertIn("FULL mode requires health_gate PASS before final_report PASS", out.getvalue())
+        self.assertIn("FULL 执行等级要求阶段 solution_review 在 final_report 通过前为 PASS", out.getvalue())
+        self.assertIn("FULL 执行等级要求阶段 health_gate 在 final_report 通过前为 PASS", out.getvalue())
 
     def test_close_command_requires_gate_and_final_report_before_marking_run_closed(self):
         self.controller.main([
@@ -1011,8 +1037,8 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("FAIL close close-run", out.getvalue())
-        self.assertIn("final_report must be PASS before close", out.getvalue())
+        self.assertIn("FAIL 运行无法收口：close-run", out.getvalue())
+        self.assertIn("收口前，final_report 必须为 PASS", out.getvalue())
 
         self.controller.main([
             "record-stage",
@@ -1066,7 +1092,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        self.assertIn("PASS close close-run", out.getvalue())
+        self.assertIn("PASS 运行已收口：close-run", out.getvalue())
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["status"], "PASS")
         self.assertEqual(state["current_stage"], "final_report")
@@ -1076,7 +1102,7 @@ decision: captured
         self.assertEqual(evidence["git_gate"]["diff_summary"], "M README.md")
         self.assertEqual(evidence["compound_capture"]["decision"], "skipped")
         self.assertIn("final_report", evidence["evidence_matrix"])
-        self.assertIn("CI/remote verification not covered by local close", evidence["uncovered"])
+        self.assertIn("本地收口未覆盖 CI 或远端验证", evidence["uncovered"])
         self.assertTrue((run_dir / "artifacts" / "close-evidence.json").exists())
         self.assertFalse((run_dir / "events.jsonl").exists(), "events.jsonl should be archived after close")
         self.assertFalse((run_dir / "artifacts" / "repair-tickets").exists(), "repair-tickets should be archived after close")
@@ -1114,9 +1140,9 @@ decision: captured
 
         self.assertEqual(code, 1)
         text = out.getvalue()
-        self.assertIn("requirement_interview must be PASS before solution_design", text)
-        self.assertIn("spec_review must be PASS before solution_design", text)
-        self.assertIn("mode_selection must be PASS before solution_design", text)
+        self.assertIn("进入 solution_design 前，阶段 requirement_interview 必须为 PASS", text)
+        self.assertIn("进入 solution_design 前，阶段 spec_review 必须为 PASS", text)
+        self.assertIn("进入 solution_design 前，阶段 mode_selection 必须为 PASS", text)
 
     def test_light_skipped_stage_allows_advance_and_syncs_worklist(self):
         self.controller.main([
@@ -1151,7 +1177,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 0, out.getvalue())
-        self.assertIn("PASS advanced to solution_design", out.getvalue())
+        self.assertIn("PASS 已进入阶段：solution_design", out.getvalue())
         worklist_text = (run_dir / "worklist.yml").read_text(encoding="utf-8")
         self.assertIn("current_stage: solution_design", worklist_text)
 
@@ -1190,7 +1216,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("spec_review must be PASS before solution_design", out.getvalue())
+        self.assertIn("进入 solution_design 前，阶段 spec_review 必须为 PASS", out.getvalue())
 
     def test_light_cannot_skip_hard_required_stage(self):
         self.controller.main([
@@ -1223,7 +1249,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("spec_draft must be PASS before spec_review", out.getvalue())
+        self.assertIn("进入 spec_review 前，阶段 spec_draft 必须为 PASS", out.getvalue())
 
     def test_strict_validate_rejects_skipped_outside_allowed_mode(self):
         self.controller.main([
@@ -1251,7 +1277,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("spec_review cannot be SKIPPED in STANDARD mode", out.getvalue())
+        self.assertIn("STANDARD 执行等级不允许将阶段 spec_review 设为 SKIPPED", out.getvalue())
 
     def test_light_skipped_stages_pass_full_gate_to_solution_design(self):
         self.controller.main([
@@ -1440,7 +1466,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 0, out.getvalue())
-        self.assertIn("PASS business writes unlocked", out.getvalue())
+        self.assertIn("PASS 允许写入业务文件", out.getvalue())
 
     def test_fail_review_blocks_stage_after_max_auto_repair(self):
         self.controller.main([
@@ -1488,7 +1514,7 @@ decision: captured
             str(self.tmp),
         ], stdout=out)
         self.assertEqual(code, 1)
-        self.assertIn("solution_review is BLOCKED; return before advancing", out.getvalue())
+        self.assertIn("阶段 solution_review 状态为 BLOCKED，推进前必须返回处理", out.getvalue())
 
         # fail_review 后 worklist 与 state 同步，strict 校验不报 stage 状态漂移。
         out = io.StringIO()
@@ -1544,7 +1570,7 @@ decision: captured
             str(self.tmp),
         ], stdout=out)
         self.assertEqual(code, 1)
-        self.assertIn("health_gate is CHANGES_REQUIRED", out.getvalue())
+        self.assertIn("阶段 health_gate 状态为 CHANGES_REQUIRED", out.getvalue())
 
         # 登记指向 development 的返工单后：修复性写入放行（不再死锁）。
         self.controller.main([
@@ -1573,7 +1599,7 @@ decision: captured
             str(self.tmp),
         ], stdout=out)
         self.assertEqual(code, 0, out.getvalue())
-        self.assertIn("PASS business writes unlocked", out.getvalue())
+        self.assertIn("PASS 允许写入业务文件", out.getvalue())
 
     def test_can_write_stays_locked_when_stage_blocked_despite_repair_ticket(self):
         self.controller.main([
@@ -1632,7 +1658,7 @@ decision: captured
             str(self.tmp),
         ], stdout=out)
         self.assertEqual(code, 1)
-        self.assertIn("health_gate is BLOCKED", out.getvalue())
+        self.assertIn("阶段 health_gate 状态为 BLOCKED", out.getvalue())
 
     def test_close_repair_clears_blocked_stage_for_retry(self):
         self.controller.main([
@@ -1718,9 +1744,9 @@ decision: captured
         self.assertGreater(state["interview"]["unanswered_questions"], 0)
         self.assertIn("这个需求要解决的具体问题是什么", "\n".join(state["interview"]["blocking_questions"]))
         self.assertIn("请回答以下需求采访问题", out.getvalue())
-        self.assertIn("Q1:", out.getvalue())
-        self.assertIn("generated interview", out.getvalue())
-        self.assertIn("current_stage: requirement_interview", out.getvalue())
+        self.assertIn("问题 1：", out.getvalue())
+        self.assertIn("已生成需求采访", out.getvalue())
+        self.assertIn("当前阶段：requirement_interview", out.getvalue())
         self.assertIn("current_stage: requirement_interview", worklist)
 
     def test_spec_command_requires_passed_interview_then_generates_artifact(self):
@@ -1742,7 +1768,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("requirement_interview must be PASS before spec_draft", out.getvalue())
+        self.assertIn("进入 spec_draft 前，requirement_interview 必须为 PASS", out.getvalue())
 
         self.controller.main([
             "interview",
@@ -1767,7 +1793,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("requirement_interview cannot PASS before interview questions are answered", out.getvalue())
+        self.assertIn("需求采访问题尚未全部回答", out.getvalue())
 
         self.answer_interview_artifact("spec-command-run")
         out = io.StringIO()
@@ -1786,7 +1812,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        self.assertIn("NEED_HUMAN requirement_interview", out.getvalue())
+        self.assertIn("NEED_HUMAN 已记录阶段：requirement_interview", out.getvalue())
         run_dir = self.tmp / "docs" / "loopx" / "runs" / "spec-command-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         result = json.loads((run_dir / "stage-results" / "02-requirement-interview.json").read_text(encoding="utf-8"))
@@ -1804,7 +1830,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("requirement_interview is waiting for user confirmation", out.getvalue())
+        self.assertIn("阶段 requirement_interview 正在等待用户确认", out.getvalue())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -1820,7 +1846,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        self.assertIn("PASS confirmed requirement_interview", out.getvalue())
+        self.assertIn("PASS 已确认阶段：requirement_interview", out.getvalue())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -1838,7 +1864,7 @@ decision: captured
         self.assertIn("需求规格", artifact.read_text(encoding="utf-8"))
         self.assertEqual(state["current_stage"], "spec_draft")
         self.assertEqual(state["spec"]["status"], "DRAFT")
-        self.assertIn("generated spec", out.getvalue())
+        self.assertIn("已生成需求规格", out.getvalue())
 
     def test_mode_command_records_selection_and_requires_downgrade_reason(self):
         self.controller.main([
@@ -1875,7 +1901,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("accepted risk reason is required", out.getvalue())
+        self.assertIn("必须说明接受风险的理由", out.getvalue())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -1899,7 +1925,7 @@ decision: captured
         self.assertTrue(state["mode_decision"]["accepted_risk"]["selected_lower_than_recommended"])
         self.assertEqual(state["stages"]["mode_selection"], "ACCEPTED_RISK")
         self.assertEqual(result["status"], "ACCEPTED_RISK")
-        self.assertIn("mode selected: STANDARD", out.getvalue())
+        self.assertIn("已选择执行等级：STANDARD", out.getvalue())
 
     def test_next_advances_to_default_next_stage_when_gates_pass(self):
         self.controller.main([
@@ -1934,7 +1960,7 @@ decision: captured
         self.assertEqual(code, 0)
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["current_stage"], "solution_design")
-        self.assertIn("PASS advanced to solution_design", out.getvalue())
+        self.assertIn("PASS 已进入阶段：solution_design", out.getvalue())
 
     def test_record_stage_writes_machine_readable_result_and_state(self):
         self.controller.main([
@@ -1973,7 +1999,7 @@ decision: captured
         self.assertIn("stage: solution_design", worklist)
         self.assertIn("status: PASS", worklist)
         self.assertIn('evidence: "docs/loopx/runs/record-run/stage-results/06-solution-design.json"', worklist)
-        self.assertIn("PASS solution_design", out.getvalue())
+        self.assertIn("PASS 已记录阶段：solution_design", out.getvalue())
 
     def test_advance_blocks_when_prior_stage_is_not_pass(self):
         self.controller.main([
@@ -1997,8 +2023,8 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("FAIL advance blocked", out.getvalue())
-        self.assertIn("solution_review must be PASS before development", out.getvalue())
+        self.assertIn("FAIL 阶段推进被阻止", out.getvalue())
+        self.assertIn("进入 development 前，阶段 solution_review 必须为 PASS", out.getvalue())
 
     def test_can_write_business_requires_development_solution_and_test_review_pass(self):
         self.controller.main([
@@ -2022,8 +2048,8 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("FAIL business writes locked", out.getvalue())
-        self.assertIn("current_stage must be development", out.getvalue())
+        self.assertIn("FAIL 业务文件写入仍被锁定", out.getvalue())
+        self.assertIn("当前阶段必须为 development", out.getvalue())
 
         run_dir = self.tmp / "docs" / "loopx" / "runs" / "write-run"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
@@ -2044,7 +2070,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        self.assertIn("PASS business writes unlocked", out.getvalue())
+        self.assertIn("PASS 允许写入业务文件", out.getvalue())
 
     def test_confirmation_gate_record_pass_waits_for_confirm_stage_and_blocks_next(self):
         self.controller.main([
@@ -2093,7 +2119,7 @@ decision: captured
         self.assertEqual(result["agent_result"], "PASS")
         self.assertTrue(result["user_confirmation_required"])
         self.assertEqual(result["next_action"], "confirm-stage --stage solution_review")
-        self.assertIn("NEED_HUMAN solution_review", out.getvalue())
+        self.assertIn("NEED_HUMAN 已记录阶段：solution_review", out.getvalue())
         self.assertIn('stage: solution_review\n    name: "方案审核"\n    status: NEED_HUMAN', worklist)
 
         out = io.StringIO()
@@ -2105,7 +2131,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("solution_review is waiting for user confirmation; run confirm-stage --stage solution_review", out.getvalue())
+        self.assertIn("阶段 solution_review 正在等待用户确认；请执行 confirm-stage --stage solution_review", out.getvalue())
 
     def test_confirm_stage_changes_waiting_gate_to_pass_and_allows_advance(self):
         self.controller.main([
@@ -2165,7 +2191,7 @@ decision: captured
         self.assertEqual(result["confirmed_by"], "user")
         self.assertEqual(result["confirmation_evidence"], ["user confirmed"])
         self.assertFalse(result["user_confirmation_required"])
-        self.assertIn("PASS confirmed solution_review", out.getvalue())
+        self.assertIn("PASS 已确认阶段：solution_review", out.getvalue())
 
         out = io.StringIO()
         code = self.controller.main([
@@ -2177,7 +2203,7 @@ decision: captured
 
         self.assertEqual(code, 0)
         self.assertEqual(self.read_state("confirm-command-run")["current_stage"], "test_design")
-        self.assertIn("PASS advanced to test_design", out.getvalue())
+        self.assertIn("PASS 已进入阶段：test_design", out.getvalue())
 
     def test_test_review_pass_auto_advances_to_development_and_allows_business_writes(self):
         """test_review is no longer a confirmation gate - PASS auto-advances."""
@@ -2288,8 +2314,8 @@ decision: captured
             str(self.tmp),
         ], stdout=record_out)
 
-        self.assertIn("PASS code_review", record_out.getvalue())
-        self.assertIn("next_action: test_execution", record_out.getvalue())
+        self.assertIn("PASS 已记录阶段：code_review", record_out.getvalue())
+        self.assertIn("下一步：test_execution", record_out.getvalue())
         self.assertEqual(self.read_state("auto-code-review-run")["stages"]["code_review"], "PASS")
 
         out = io.StringIO()
@@ -2302,7 +2328,7 @@ decision: captured
 
         self.assertEqual(code, 0)
         self.assertEqual(self.read_state("auto-code-review-run")["current_stage"], "test_execution")
-        self.assertIn("PASS advanced to test_execution", out.getvalue())
+        self.assertIn("PASS 已进入阶段：test_execution", out.getvalue())
 
     def test_release_readiness_auto_advances_to_final_report(self):
         """release_readiness is no longer a confirmation gate - PASS auto-advances."""
@@ -2407,7 +2433,7 @@ decision: captured
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("solution_review PASS requires confirmation metadata", out.getvalue())
+        self.assertIn("阶段 solution_review 记录为 PASS 时必须包含确认信息", out.getvalue())
 
     def test_review_feedback_marks_changes_required_and_returns_to_stage(self):
         self.controller.main([
@@ -2527,7 +2553,7 @@ items:
             "ShopLimitExceededException must be in com.crosscomm.admin.exception",
             "GlobalExceptionHandler must remain in controller.handler",
         ])
-        self.assertIn("repair_ticket: W1", out.getvalue())
+        self.assertIn("返工单：W1", out.getvalue())
 
     def test_claim_stage_returns_open_repair_ticket_for_owner_role(self):
         self.controller.main([
@@ -2566,10 +2592,10 @@ items:
 
         self.assertEqual(code, 0)
         text = out.getvalue()
-        self.assertIn("PASS claimed solution_design", text)
-        self.assertIn("assigned_to: solution-designer", text)
-        self.assertIn("repair_ticket: W1", text)
-        self.assertIn("required_change: exception package wrong", text)
+        self.assertIn("PASS 已领取阶段：solution_design", text)
+        self.assertIn("负责人：solution-designer", text)
+        self.assertIn("返工单：W1", text)
+        self.assertIn("必需修改：exception package wrong", text)
 
     def test_close_repair_marks_ticket_closed_and_requires_revision(self):
         self.controller.main([
@@ -2619,7 +2645,7 @@ items:
         self.assertEqual(ticket["artifact"], "stage-results/06-solution-design.json")
         self.assertEqual(ticket["revision"], 2)
         self.assertEqual(ticket["changes_from_review"], ["fixed exception package boundary"])
-        self.assertIn("PASS repair closed W1", out.getvalue())
+        self.assertIn("PASS 已关闭返工单：W1", out.getvalue())
 
     def test_advance_blocks_until_return_stage_repair_ticket_is_closed(self):
         self.controller.main([
@@ -2670,7 +2696,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 1)
-        self.assertIn("repair ticket W1 must be CLOSED before solution_review", out.getvalue())
+        self.assertIn("进入 solution_review 前必须关闭返工单 W1", out.getvalue())
 
         self.controller.main([
             "close-repair",
@@ -2713,7 +2739,7 @@ items:
         ], stdout=out)
 
         self.assertEqual(code, 0)
-        self.assertIn("PASS advanced to solution_review", out.getvalue())
+        self.assertIn("PASS 已进入阶段：solution_review", out.getvalue())
 
 
 if __name__ == "__main__":

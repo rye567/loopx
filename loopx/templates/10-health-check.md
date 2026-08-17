@@ -1,7 +1,7 @@
 # 10 健康检查
 
 - 状态：
-- Worklist 完成情况：
+- 工作项完成情况：
 - 阶段文档完整性：
 - 核心健康检查：
 - 必需检查：
@@ -13,7 +13,7 @@
 - 高风险项关闭情况：
 - 清理验证：
 - 未解决问题：
-- /health 评分：
+- 健康检查结论：
 - 阻塞项：
 - 收口检查结论：
 
@@ -21,7 +21,7 @@
 
 ```yaml
 stage_result:
-  stage: "10 健康门"
+  stage: health_gate
   status:
   return_to:
   next_action:
@@ -31,7 +31,7 @@ stage_result:
   blocked_reason:
 ```
 
-## Evidence
+## 证据
 
 | 类型 | 命令/文件 | 结果 | 说明 |
 |---|---|---|---|

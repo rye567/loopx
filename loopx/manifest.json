@@ -3,5 +3,26 @@
   "version": "0.1.1",
   "description": "Git-maintained LoopX skill package for Codex and Claude Code.",
   "skillFile": "SKILL.md",
-  "controllerScript": "tools/loopx_controller.py"
+  "controllerScript": "tools/loopx_controller.py",
+  "resources": {
+    "standards": [
+      "standards/catalog.yml",
+      "standards/principles.md",
+      "standards/architecture-standard.md",
+      "standards/security-standard.md",
+      "standards/performance-standard.md",
+      "standards/reliability-observability-standard.md"
+    ],
+    "schemas": [
+      "schemas/standard-catalog.schema.json",
+      "schemas/project-policy.schema.json",
+      "schemas/solution.schema.json",
+      "schemas/test-plan.schema.json",
+      "schemas/development-evidence.schema.json",
+      "schemas/quality-result.schema.json",
+      "schemas/performance-result.schema.json",
+      "schemas/security-result.schema.json"
+    ],
+    "policyTemplate": "templates/loopx-policy.yml"
+  }
 }

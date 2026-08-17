@@ -13,14 +13,14 @@ AI 编程 Agent 的阶段化工程工作流。
 ```mermaid
 flowchart LR
     A["Init<br/>环境检查"] --> B["需求接收<br/>+需求采访"]
-    B -->|"confirm-stage<br/>人工确认门"| C["规格草稿<br/>+规格评审"]
+    B -->|"confirm-stage<br/>人工确认"| C["规格草稿<br/>+规格评审"]
     C --> D["等级选择<br/>LIGHT / STANDARD / FULL"]
     D --> E["方案设计<br/>+方案评审"]
-    E -->|"confirm-stage<br/>人工确认门"| F["测试设计<br/>+测试评审"]
+    E -->|"confirm-stage<br/>人工确认"| F["测试设计<br/>+测试评审"]
     F --> G["开发<br/>can-write 在此解锁"]
     G --> H["质量审计<br/>代码审查<br/>测试执行"]
-    H --> I["健康门<br/>发布就绪"]
-    I --> J["最终报告<br/>gate + close"]
+    H --> I["健康检查<br/>发布就绪"]
+    I --> J["最终报告<br/>最终检查与收口"]
 ```
 
 LoopX 是一个用 Git 维护的 Codex / Claude Code 通用 skill 包。它把 AI 编程任务从“收到需求就开始改代码”拉回到可审计的工程流程：需求采访、规格说明、人工确认的方案评审、测试设计、实现、代码评审和发布检查。
@@ -35,8 +35,8 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
 | --- | --- |
 | Agent 根据模糊提示直接开写 | 先进行需求接入和需求采访 |
 | 验收标准靠聊天上下文隐含 | 生成并评审明确的 Spec |
-| 评审容易被口头带过 | 评审门必须记录证据 |
-| 高风险写入过早发生 | 评审门通过前阻止业务写入 |
+| 评审容易被口头带过 | 评审必须记录证据 |
+| 高风险写入过早发生 | 方案确认前阻止业务写入 |
 | “完成”只是一句聊天回复 | 收口检查记录本地验证、风险缺口和发布准备度 |
 
 ## 工作流
@@ -59,7 +59,7 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
   -> 发布准备
 ```
 
-完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。控制器会把每次运行持久化到 `docs/loopx/runs/<run_id>/`，仅存 controller 状态、worklist、events、stage-results 和自动生成 artifact；收口时中间状态（events、repair-tickets）归档到 `artifacts/archive/`，整个目录不进版本库。LoopX 也可以在收口前记录 Compound Capture 决策：无复用价值时 skipped，有价值且显式允许时 captured 到 `docs/loopx/solutions/<category>/<slug>.md`。
+完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。新运行默认保存在操作系统的用户状态目录中，每个运行静稳时只有一个 `<project-id>/<run_id>/run.json`，项目内不生成流程控制 JSON；`state.json`、工作清单、事件、阶段结果和自动产物仍以逻辑文件形式收纳在该容器中，所以阶段与检查功能不变。`LOOPX_STATE_DIR` 可覆盖状态根目录，`LOOPX_STATE_BACKEND=project` 可显式使用旧项目目录格式；已有 `docs/loopx/runs/<run_id>/` 运行会继续按旧格式读取，不自动迁移或删除。LoopX 也会在收口前记录经验沉淀决定：没有复用价值时选择 skipped，有价值且显式允许时以 captured 形式写入 `docs/loopx/solutions/<category>/<slug>.md`。
 
 ## 安装
 
@@ -135,7 +135,7 @@ python loopx/tools/loopx_controller.py git-gate <run_id>
 python loopx/tools/loopx_controller.py close <run_id>
 ```
 
-写入业务逻辑前，LoopX 要求相关人工确认评审门已经通过：
+写入业务逻辑前，LoopX 要求相关评审已经通过并获得人工确认：
 
 ```bash
 python loopx/tools/loopx_controller.py can-write --kind business
@@ -145,9 +145,10 @@ python loopx/tools/loopx_controller.py can-write --kind business
 
 - `loopx/SKILL.md`：Codex 和 Claude Code 的 skill 入口
 - `loopx/workflow.md`：阶段化工作流契约
-- `loopx/agents/`：各质量阶段的角色说明
+- `loopx/standards/`：工程原则、主题标准和版本化规则目录
+- `loopx/agents/`：各审核阶段的角色说明
 - `loopx/templates/`：需求采访、Spec、评审和发布报告模板
-- `loopx/schemas/`：状态、阶段结果、追踪、模式选择、Spec 和复利沉淀的 JSON Schema
+- `loopx/schemas/`：状态、阶段结果、项目策略，以及方案、测试、开发、质量、性能和安全产物的结构定义
 - `loopx/tools/loopx_controller.py`：本地状态控制器
 - `loopx/tools/loopx_check.py`：健康检查和包检查
 - `tests/`：控制器和 skill 包的回归测试

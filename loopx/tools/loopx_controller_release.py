@@ -38,7 +38,7 @@ def collect_git_status(project):
     except (OSError, subprocess.TimeoutExpired) as exc:
         return "NEED_HUMAN", "", str(exc)
     if probe.returncode != 0 or probe.stdout.strip() != "true":
-        return "NEED_HUMAN", "", "not a git work tree"
+        return "NEED_HUMAN", "", "项目目录不是 Git 工作区"
     try:
         status = subprocess.run(
             ["git", "-C", str(project), "status", "--short"],
@@ -50,10 +50,10 @@ def collect_git_status(project):
     except (OSError, subprocess.TimeoutExpired) as exc:
         return "NEED_HUMAN", "", str(exc)
     if status.returncode != 0:
-        return "NEED_HUMAN", "", (status.stderr or "git status failed").strip()
+        return "NEED_HUMAN", "", (status.stderr or "无法读取 Git 状态").strip()
     summary = status.stdout.strip()
     if not summary:
-        return "NEED_HUMAN", "", "no changed files"
+        return "NEED_HUMAN", "", "没有检测到变更文件"
     return "PASS", summary, ""
 
 
@@ -83,10 +83,10 @@ def build_close_evidence(project, run_id, state):
         "evidence_matrix": evidence_matrix,
         "ci_coverage": {
             "status": "LOCAL_ONLY",
-            "summary": "CI/remote verification not executed by local close",
+            "summary": "本地收口未执行 CI 或远端验证",
         },
         "uncovered": [
-            "CI/remote verification not covered by local close",
+            "本地收口未覆盖 CI 或远端验证",
         ],
     }
 
@@ -99,39 +99,47 @@ def archive_intermediate_state(directory):
     移到 artifacts/archive/ 下统一存放；归档失败不影响 close 收口。
     """
     if not directory.exists():
-        return
+        return []
     archive_dir = directory / "artifacts" / "archive"
     moves = [
         directory / "events.jsonl",
         directory / "artifacts" / "repair-tickets",
     ]
     moved = []
+    warnings = []
     for source in moves:
         if not source.exists():
             continue
-        if source.is_dir():
-            target = archive_dir / source.name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if target.exists():
-                shutil.rmtree(target)
-            source.rename(target)
-        else:
-            target = archive_dir / source.name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if target.exists():
-                target.unlink()
-            source.rename(target)
-        moved.append(str(target.relative_to(directory)))
+        try:
+            if source.is_dir():
+                target = archive_dir / source.name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    shutil.rmtree(target)
+                source.rename(target)
+            else:
+                target = archive_dir / source.name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    target.unlink()
+                source.rename(target)
+            moved.append(str(target.relative_to(directory)))
+        except OSError as exc:
+            warnings.append(f"无法归档 {source.name}：{exc}")
     if moved:
         # 事件日志先归档再追加，避免在 run 根目录重建 events.jsonl。
         archive_events = archive_dir / "events.jsonl"
         if archive_events.exists():
-            with archive_events.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({
-                    "time": datetime.now().isoformat(timespec="seconds"),
-                    "type": "close_archived",
-                    "archived": moved,
-                }, ensure_ascii=False) + "\n")
+            try:
+                with archive_events.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps({
+                        "time": datetime.now().isoformat(timespec="seconds"),
+                        "type": "close_archived",
+                        "archived": moved,
+                    }, ensure_ascii=False) + "\n")
+            except OSError as exc:
+                warnings.append(f"无法写入归档事件：{exc}")
+    return warnings
 
 
 def cmd_close(args, stdout):
@@ -143,14 +151,14 @@ def cmd_close(args, stdout):
         print(str(exc), file=stdout)
         return 1
     if state.get("stages", {}).get("final_report") != "PASS":
-        print(f"FAIL close {run_id}", file=stdout)
-        print("- final_report must be PASS before close", file=stdout)
+        print(f"FAIL 运行无法收口：{run_id}", file=stdout)
+        print("- 收口前，final_report 必须为 PASS", file=stdout)
         return 1
     # close 不自行放行，先复用严格检查，避免收口路径和 validate 路径分叉。
     errors = validate_run(project, run_id, strict=True)
     if errors:
-        print(f"FAIL close {run_id}", file=stdout)
-        print("- strict check failed", file=stdout)
+        print(f"FAIL 运行无法收口：{run_id}", file=stdout)
+        print("- 严格检查未通过", file=stdout)
         for error in errors:
             print(f"- {error}", file=stdout)
         return 1
@@ -170,9 +178,11 @@ def cmd_close(args, stdout):
     except (FileNotFoundError, YamlSubsetError):
         pass
     append_event(get_run_dir(project, run_id), {"type": "run_closed", "run_id": run_id})
-    archive_intermediate_state(get_run_dir(project, run_id))
-    print(f"PASS close {run_id}", file=stdout)
-    print("status: PASS", file=stdout)
+    archive_warnings = archive_intermediate_state(get_run_dir(project, run_id))
+    print(f"PASS 运行已收口：{run_id}", file=stdout)
+    print("运行状态：PASS", file=stdout)
+    for warning in archive_warnings:
+        print(f"警告：{warning}", file=stdout)
     return 0
 
 
@@ -197,9 +207,9 @@ def cmd_git_gate(args, stdout):
         "reason": reason,
     })
     if status == "PASS":
-        print(f"PASS git gate {run_id}", file=stdout)
+        print(f"PASS Git 变更检查通过：{run_id}", file=stdout)
         print(summary, file=stdout)
         return 0
-    print(f"NEED_HUMAN git gate {run_id}", file=stdout)
+    print(f"NEED_HUMAN Git 变更检查需要用户处理：{run_id}", file=stdout)
     print(f"- {reason}", file=stdout)
     return 1

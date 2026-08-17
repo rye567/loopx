@@ -12,12 +12,14 @@
 
 - `SKILL.md`：skill 入口和不可跳过规则。
 - `workflow.md`：阶段化工程工作流主流程。
+- `standards/`：工程标准和版本化规则目录 `standards/catalog.yml`。
 - `agents/`：阶段角色职责。
 - `templates/`：阶段文档模板。
-- `schemas/`：运行状态、worklist、阶段结果、health、interview、spec、mode、tracking、compound learning 契约。
-- `health.yml`、`risk.yml`、`project-profiles.yml`：策略配置。
+- `schemas/`：运行状态、工作项、阶段结果、规则目录、项目策略和六类阶段产物契约。
+- `health.yml`、`risk.yml`、`project-profiles.yml`：健康检查、风险映射和项目类型配置。
+- `templates/loopx-policy.yml`：可选项目策略示例；LoopX 不会自动写入项目。
 - `tools/loopx_controller.py`：本地状态控制器。
-- `docs/loopx/runs/<run_id>/`：controller 状态、worklist、events、stage-results 和自动生成 artifact；收口时中间状态（events、repair-tickets）归档到 `artifacts/archive/`，该目录不进版本库。
+- 用户状态目录 `<project-id>/<run_id>/run.json`：新运行的单文件容器；项目内的 `docs/loopx/runs/<run_id>/` 只作为旧运行兼容格式，不自动迁移或删除。
 - `docs/loopx/solutions/<category>/<slug>.md`：显式允许后写入的长期复用学习。
 
 ## 状态控制器
@@ -36,6 +38,8 @@ python tools/loopx_controller.py compound <run_id> --decision skipped --reason "
 
 `interview` 会把需求采访问题输出给用户；必须把用户回答写入 `interview.md`，且文件不再包含“待用户回答/未回答”等占位后，才能记录 `requirement_interview PASS`。
 
+新运行的逻辑产物位于单文件容器内。用 `import-artifact --source <文件> --target artifacts/<名称>` 收纳已编辑的 interview/spec 或其他运行产物；结构化阶段产物可直接用 `record-stage --artifact-file 类型=<文件>` 导入并记录。`LOOPX_STATE_DIR` 可指定状态根，`LOOPX_STATE_BACKEND=project` 可创建旧目录格式的新运行。
+
 需要用户确认的阶段，agent `PASS` 会先落为 `NEED_HUMAN`；用户确认后用 `confirm-stage` 转为 `PASS`。业务写入前用 `can-write` 检查写入条件：
 
 ```bash
@@ -44,4 +48,4 @@ python tools/loopx_controller.py confirm-stage --stage solution_review --evidenc
 python tools/loopx_controller.py can-write --kind business
 ```
 
-Compound Capture 默认只记录 `docs/loopx/runs/<run_id>/artifacts/compound-capture.md`。只有用户确认或项目配置允许时，才用 `--write-project-doc` 写入 `docs/loopx/solutions/<category>/<slug>.md`。
+经验沉淀默认只记录 `docs/loopx/runs/<run_id>/artifacts/compound-capture.md`。只有用户确认或项目配置允许时，才用 `--write-project-doc` 写入 `docs/loopx/solutions/<category>/<slug>.md`。

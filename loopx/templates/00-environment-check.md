@@ -27,7 +27,7 @@ stage_result:
   blocked_reason: ""
 ```
 
-## Evidence
+## 证据
 
 | 类型 | 命令/文件 | 结果 | 说明 |
 |---|---|---|---|

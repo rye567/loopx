@@ -13,6 +13,8 @@ score_rules:
   async: 3
   dependency: 3
   config_or_secret: 3
+  performance: 3
+  reliability: 3
   ambiguous_requirement: 2
   test_only: -1
   docs_only: -1
@@ -21,3 +23,94 @@ thresholds:
   light_max: 1
   standard_max: 5
   full_min: 6
+
+risk_profiles:
+  auth:
+    minimum_mode: FULL
+    rule_sets:
+      - security
+      - testing
+  permission:
+    minimum_mode: FULL
+    rule_sets:
+      - security
+      - testing
+  tenant_scope:
+    minimum_mode: FULL
+    rule_sets:
+      - security
+      - testing
+  db_schema:
+    minimum_mode: FULL
+    rule_sets:
+      - architecture
+      - reliability
+      - testing
+  external_side_effect:
+    minimum_mode: FULL
+    rule_sets:
+      - security
+      - reliability
+      - testing
+  core_state_transition:
+    minimum_mode: FULL
+    rule_sets:
+      - architecture
+      - reliability
+      - testing
+  api_contract:
+    minimum_mode: STANDARD
+    rule_sets:
+      - architecture
+      - testing
+  sql:
+    minimum_mode: STANDARD
+    rule_sets:
+      - architecture
+      - security
+      - testing
+  mq:
+    minimum_mode: STANDARD
+    rule_sets:
+      - reliability
+      - observability
+      - testing
+  async:
+    minimum_mode: STANDARD
+    rule_sets:
+      - reliability
+      - observability
+      - testing
+  dependency:
+    minimum_mode: STANDARD
+    rule_sets:
+      - security
+      - reliability
+  config_or_secret:
+    minimum_mode: STANDARD
+    rule_sets:
+      - security
+  performance:
+    minimum_mode: STANDARD
+    rule_sets:
+      - performance
+      - testing
+  reliability:
+    minimum_mode: STANDARD
+    rule_sets:
+      - reliability
+      - observability
+      - testing
+  ambiguous_requirement:
+    minimum_mode: STANDARD
+    rule_sets:
+      - common
+      - testing
+  test_only:
+    minimum_mode: LIGHT
+    rule_sets:
+      - testing
+  docs_only:
+    minimum_mode: LIGHT
+    rule_sets:
+      - common

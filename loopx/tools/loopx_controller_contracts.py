@@ -23,8 +23,8 @@ STAGE_SEQUENCE = [
 STAGES = set(STAGE_SEQUENCE)
 STAGE_STATUSES = {"PASS", "CHANGES_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK", "NEED_HUMAN"}
 PASSING_STATUSES = {"PASS", "ACCEPTED_RISK"}
-# 各模式允许显式 SKIPPED 的阶段（唯一事实源，workflow.md 的“跳过的审核门”以此为准）。
-# LIGHT 跳过审核/审计门，保留输入、开发、轻量审查、最小验证、健康门和最终报告；
+# 各模式允许显式 SKIPPED 的阶段（唯一事实源，workflow.md 的“跳过审核阶段”以此为准）。
+# LIGHT 跳过部分审核/审计阶段，保留输入、开发、轻量审查、最小验证、健康检查和最终报告；
 # STANDARD/FULL 不允许跳过任何阶段。
 MODE_SKIPPABLE_STAGES = {
     "LIGHT": frozenset({
@@ -104,7 +104,7 @@ STAGE_DISPLAY_NAMES = {
     "quality_audit": "质量审计",
     "code_review": "代码审查",
     "test_execution": "测试执行",
-    "health_gate": "健康门",
+    "health_gate": "健康检查",
     "release_readiness": "发布就绪",
     "final_report": "最终报告",
 }

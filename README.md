@@ -13,14 +13,14 @@ Staged workflow checks for AI coding agents.
 ```mermaid
 flowchart LR
     A["Init<br/>env check"] --> B["Requirement<br/>intake + interview"]
-    B -->|"confirm-stage<br/>human gate"| C["Spec draft<br/>+ review"]
+    B -->|"confirm-stage<br/>human confirmation"| C["Spec draft<br/>+ review"]
     C --> D["Mode select<br/>LIGHT / STANDARD / FULL"]
     D --> E["Solution design<br/>+ review"]
-    E -->|"confirm-stage<br/>human gate"| F["Test design<br/>+ review"]
+    E -->|"confirm-stage<br/>human confirmation"| F["Test design<br/>+ review"]
     F --> G["Development<br/>can-write unlocks here"]
     G --> H["Quality audit<br/>code review<br/>test execution"]
-    H --> I["Health gate<br/>release readiness"]
-    I --> J["Final report<br/>gate + close"]
+    H --> I["Health check<br/>release readiness"]
+    I --> J["Final report<br/>final check + close"]
 ```
 
 LoopX is a Git-maintained skill package for Codex and Claude Code. It keeps AI coding work from jumping straight into implementation by guiding risky changes through requirement interview, spec drafting, human-confirmed reviews, test planning, implementation, and release checks.
@@ -59,7 +59,7 @@ request
   -> release readiness
 ```
 
-The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). The controller persists each run under `docs/loopx/runs/<run_id>/`, limited to controller state, worklists, events, stage results, and generated artifacts; on close, intermediate state files (`events.jsonl`, `repair-tickets/`) are archived into `artifacts/archive/` and the whole directory is git-ignored. LoopX can also record a Compound Capture decision before close: skipped when there is no reusable learning, or captured into `docs/loopx/solutions/<category>/<slug>.md` when explicitly enabled.
+The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). New runs are stored in the platform user-state directory as one `<project-id>/<run_id>/run.json` file at rest, so the project receives no workflow-control JSON. The existing logical state, worklist, event, stage-result, and generated-artifact files remain inside that container, preserving controller behavior. `LOOPX_STATE_DIR` overrides the state root and `LOOPX_STATE_BACKEND=project` selects the legacy project-directory backend; existing `docs/loopx/runs/<run_id>/` runs remain readable in place and are never migrated or deleted automatically. LoopX can also record a Compound Capture decision before close: skipped when there is no reusable learning, or captured into `docs/loopx/solutions/<category>/<slug>.md` when explicitly enabled.
 
 ## Install
 
@@ -150,9 +150,10 @@ python loopx/tools/loopx_controller.py can-write --kind business
 
 - `loopx/SKILL.md`: the Codex and Claude Code skill entry point
 - `loopx/workflow.md`: the staged workflow contract
-- `loopx/agents/`: role instructions for each quality stage
+- `loopx/standards/`: engineering principles, topic standards, and the versioned rule catalog
+- `loopx/agents/`: role instructions for each review stage
 - `loopx/templates/`: artifact templates for interviews, specs, reviews, and release reports
-- `loopx/schemas/`: JSON schemas for state, stage results, tracking, mode selection, specs, and compound learnings
+- `loopx/schemas/`: JSON schemas for state, stage results, policies, and structured solution, test, development, quality, performance, and security artifacts
 - `loopx/tools/loopx_controller.py`: the local state controller
 - `loopx/tools/loopx_check.py`: health and package checks
 - `tests/`: regression tests for the controller and skill package

@@ -12,12 +12,12 @@
 
 1. 读取 run、mode、spec 状态和 current stage。
 2. 按 00-16 阶段展示完成、当前、待办状态。
-3. 汇总 blocking issues、accepted risk 和 next action。
+3. 汇总阻塞问题、已接受风险和下一步动作。
 4. 在 `stage_result.tracking_snapshot` 中保存快照。
 
 ## 输出
 
-- 追踪文本块、`tracking_snapshot`、当前阻塞项和下一步动作。
+- 追踪文本、`tracking_snapshot`、当前阻塞项和下一步动作。
 
 ## 通过标准
 

@@ -48,24 +48,26 @@ def dump_worklist(worklist):
     items = worklist.get("items") or []
     if not items:
         lines.append("items: []")
-    for item in items:
-        lines.append(f"  - id: {render_yaml_value(item.get('id', ''))}")
-        for key in (
-            "title",
-            "status",
-            "risk_tags",
-            "owner_agent",
-            "read_scope",
-            "write_scope",
-            "dependencies",
-            "validation",
-            "evidence",
-            "failed_by",
-            "return_to",
-            "required_changes",
-        ):
-            default = [] if key in list_defaults else ""
-            lines.append(f"    {key}: {render_yaml_value(item.get(key, default))}")
+    else:
+        lines.append("items:")
+        for item in items:
+            lines.append(f"  - id: {render_yaml_value(item.get('id', ''))}")
+            for key in (
+                "title",
+                "status",
+                "risk_tags",
+                "owner_agent",
+                "read_scope",
+                "write_scope",
+                "dependencies",
+                "validation",
+                "evidence",
+                "failed_by",
+                "return_to",
+                "required_changes",
+            ):
+                default = [] if key in list_defaults else ""
+                lines.append(f"    {key}: {render_yaml_value(item.get(key, default))}")
     return "\n".join(lines) + "\n"
 
 
@@ -77,6 +79,14 @@ def parse_scalar(text):
         return []
     if value in {"{}", "{ }"}:
         return {}
+    if value.startswith("[") and value.endswith("]"):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise YamlSubsetError(f"invalid inline array: {value}") from exc
+        if not isinstance(parsed, list):
+            raise YamlSubsetError(f"expected inline array: {value}")
+        return parsed
     if value.lower() == "true":
         return True
     if value.lower() == "false":
@@ -136,6 +146,8 @@ def parse_dict(lines, index, indent):
         if stripped.startswith("- "):
             break
         key, raw_value = split_key_value(stripped)
+        if key in data:
+            raise YamlSubsetError(f"duplicate key: {key}")
         index += 1
         if raw_value:
             data[key] = parse_scalar(raw_value)
@@ -174,6 +186,9 @@ def parse_list(lines, index, indent):
                 extra, index = parse_block(lines, index, lines[index][0])
                 if not isinstance(extra, dict):
                     raise YamlSubsetError(f"expected mapping after list item: {rest}")
+                duplicates = sorted(set(item).intersection(extra))
+                if duplicates:
+                    raise YamlSubsetError(f"duplicate key in list item: {', '.join(duplicates)}")
                 item.update(extra)
         else:
             item = parse_scalar(rest)

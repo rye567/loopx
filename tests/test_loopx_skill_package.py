@@ -77,6 +77,7 @@ class LoopxSkillPackageTest(unittest.TestCase):
             "health.yml",
             "risk.yml",
             "project-profiles.yml",
+            "standards/catalog.yml",
             "tools/loopx_controller.py",
         ]
 
@@ -97,6 +98,20 @@ class LoopxSkillPackageTest(unittest.TestCase):
         self.assertTrue((LOOPX / "health.yml").exists())
         self.assertTrue((LOOPX / "risk.yml").exists())
         self.assertTrue((LOOPX / "project-profiles.yml").exists())
+        self.assertTrue((LOOPX / "standards" / "catalog.yml").exists())
+        self.assertTrue((LOOPX / "templates" / "loopx-policy.yml").exists())
+        for name in (
+            "standard-catalog.schema.json",
+            "project-policy.schema.json",
+            "solution.schema.json",
+            "test-plan.schema.json",
+            "development-evidence.schema.json",
+            "quality-result.schema.json",
+            "performance-result.schema.json",
+            "security-result.schema.json",
+        ):
+            with self.subTest(schema=name):
+                self.assertTrue((LOOPX / "schemas" / name).exists())
         self.assertTrue((LOOPX / "tools" / "loopx_controller.py").exists())
 
     def test_sync_and_installer_artifacts_are_removed(self):
@@ -129,6 +144,27 @@ class LoopxSkillPackageTest(unittest.TestCase):
             self.assertNotIn("targets", manifest)
             self.assertIn("skill", manifest["description"].lower())
             self.assertIn("git", manifest["description"].lower())
+
+        for manifest, base in ((root_manifest, ROOT), (loopx_manifest, LOOPX)):
+            resources = manifest.get("resources", {})
+            self.assertTrue(resources.get("standards"))
+            self.assertTrue(resources.get("schemas"))
+            for group in ("standards", "schemas"):
+                for resource in resources[group]:
+                    with self.subTest(resource=resource):
+                        self.assertTrue((base / resource).exists())
+            self.assertTrue((base / resources["policyTemplate"]).exists())
+
+    def test_readmes_describe_rules_and_structured_artifacts(self):
+        english = (ROOT / "README.md").read_text(encoding="utf-8")
+        chinese = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+        package = (LOOPX / "README.md").read_text(encoding="utf-8")
+        self.assertIn("versioned rule catalog", english)
+        self.assertIn("structured solution", english)
+        self.assertIn("版本化规则目录", chinese)
+        self.assertIn("方案、测试、开发、质量、性能和安全产物", chinese)
+        self.assertIn("standards/catalog.yml", package)
+        self.assertIn("templates/loopx-policy.yml", package)
 
     def test_docs_do_not_advertise_sync_or_install_commands(self):
         docs = [

@@ -17,13 +17,29 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from loopx_health import aggregate_status as aggregate_health_status  # noqa: E402
+from loopx_health import execute_health  # noqa: E402
+from loopx_controller_io import get_run_dir  # noqa: E402
+from loopx_controller_state import latest_run_id  # noqa: E402
+from loopx_controller_store import ExternalRunSession, StoreError, uses_project_backend  # noqa: E402
+
 PASS = "PASS"
 PASS_WITH_WARNINGS = "PASS_WITH_WARNINGS"
 LOCAL_INCOMPLETE_CI_REQUIRED = "LOCAL_INCOMPLETE_CI_REQUIRED"
 BLOCKED = "BLOCKED"
 
 REQUIRED_STANDARDS = [
+    "principles.md",
     "requirement-standard.md",
+    "architecture-standard.md",
+    "security-standard.md",
+    "performance-standard.md",
+    "reliability-observability-standard.md",
     "development-standard.md",
     "testing-standard.md",
     "quality-standard.md",
@@ -64,9 +80,12 @@ REQUIRED_TEMPLATES = [
     "11-release-readiness.md",
     "12-final-report.md",
     "13-compound-capture.md",
+    "loopx-policy.yml",
 ]
 
 REQUIRED_SCHEMAS = [
+    "standard-catalog.schema.json",
+    "project-policy.schema.json",
     "state.schema.json",
     "stage-result.schema.json",
     "worklist.schema.json",
@@ -76,6 +95,19 @@ REQUIRED_SCHEMAS = [
     "tracking.schema.json",
     "health-result.schema.json",
     "compound-learning.schema.json",
+    "solution.schema.json",
+    "test-plan.schema.json",
+    "development-evidence.schema.json",
+    "quality-result.schema.json",
+    "performance-result.schema.json",
+    "security-result.schema.json",
+]
+
+REQUIRED_POLICY_FILES = [
+    "standards/catalog.yml",
+    "risk.yml",
+    "health.yml",
+    "project-profiles.yml",
 ]
 
 FORBIDDEN_SOURCE_PATTERNS = [
@@ -171,6 +203,7 @@ def evaluate_package(root: Path) -> HarnessReport:
         check_required_files(root, "智能体文档", "loopx/agents", REQUIRED_AGENT_DOCS),
         check_required_files(root, "模板", "loopx/templates", REQUIRED_TEMPLATES),
         check_required_files(root, "结构契约", "loopx/schemas", REQUIRED_SCHEMAS),
+        check_required_files(root, "策略资源", "loopx", REQUIRED_POLICY_FILES),
         check_skill_contracts(root),
     ]
     status = BLOCKED if any(check.status == BLOCKED for check in checks) else PASS
@@ -187,13 +220,8 @@ def load_json(path: Path) -> tuple[dict | None, str | None]:
 
 
 def find_latest_run(root: Path) -> Path | None:
-    runs = root / "docs" / "loopx" / "runs"
-    if not runs.exists():
-        return None
-    candidates = [path for path in runs.iterdir() if path.is_dir()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda path: path.stat().st_mtime)
+    run_id = latest_run_id(root)
+    return get_run_dir(root, run_id) if run_id else None
 
 
 def check_project_run(root: Path) -> CheckResult:
@@ -285,23 +313,47 @@ def check_ci_gap(root: Path) -> CheckResult:
     )
 
 
-def evaluate_project(root: Path) -> HarnessReport:
-    root = root.resolve()
+def _evaluate_project_loaded(root: Path) -> HarnessReport:
+    latest = find_latest_run(root)
+    if latest is None:
+        checks = [
+            check_project_run(root),
+            check_project_stage_results(root),
+            check_forbidden_patterns(root),
+            check_ci_gap(root),
+        ]
+        status = aggregate_health_status(check.status for check in checks)
+        return HarnessReport(mode="project", root=str(root), status=status, checks=checks)
+
+    # 项目模式与控制器共用配置驱动的执行器，避免两处维护不同判断。
+    health_report = execute_health(root, latest.name, write_result=False)
     checks = [
         check_project_run(root),
-        check_project_stage_results(root),
+        *[
+            CheckResult(item.name, item.status, item.message, item.evidence)
+            for item in health_report.checks
+        ],
         check_forbidden_patterns(root),
-        check_ci_gap(root),
     ]
-    if any(check.status == BLOCKED for check in checks):
-        status = BLOCKED
-    elif any(check.status == LOCAL_INCOMPLETE_CI_REQUIRED for check in checks):
-        status = LOCAL_INCOMPLETE_CI_REQUIRED
-    elif any(check.status == PASS_WITH_WARNINGS for check in checks):
-        status = PASS_WITH_WARNINGS
-    else:
-        status = PASS
+    status = aggregate_health_status([health_report.status, *(check.status for check in checks)])
     return HarnessReport(mode="project", root=str(root), status=status, checks=checks)
+
+
+def evaluate_project(root: Path) -> HarnessReport:
+    root = root.resolve()
+    try:
+        run_id = latest_run_id(root)
+        if run_id is None or uses_project_backend(root, run_id):
+            return _evaluate_project_loaded(root)
+        with ExternalRunSession(root, run_id):
+            return _evaluate_project_loaded(root)
+    except (StoreError, OSError) as exc:
+        return HarnessReport(
+            mode="project",
+            root=str(root),
+            status=BLOCKED,
+            checks=[CheckResult("loopx_run_state", BLOCKED, f"状态存储错误：{exc}", [])],
+        )
 
 
 def print_text(report: HarnessReport) -> None:

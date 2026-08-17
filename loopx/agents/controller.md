@@ -8,12 +8,14 @@
 
 - 用户请求或 run id。
 - `docs/loopx/runs/<run_id>/state.json`、`worklist.yml`、阶段结果。
-- LoopX 标准、skill 和项目 harness。
+- 本次运行的规则快照、结构化产物、LoopX 标准、skill 和项目 harness。
 
 ## 检查
 
 - `CHANGES_REQUIRED`、`BLOCKED` 或 `NEED_HUMAN` 不得自动推进。
 - LLM 审核文字不是硬证据。
+- v2 运行按 `catalog_version` 和规则快照判断适用规则；v1 运行继续使用原有契约，不强制迁移。
+- 结构或证据检查失败时，不得写入部分阶段结果、状态、工作项或事件。
 - 执行深度和上游放行条件无效时不得允许开发写入。
 - commit、push、deploy、破坏性删除、生产写入等高风险动作必须人工确认。
 

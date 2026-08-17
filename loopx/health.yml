@@ -12,7 +12,13 @@ health:
     - validation_evidence_exists
     - cleanup_verified
     - ci_gap_declared
-    - compound_capture_decision_recorded
+    - required_rule_results
+    - accepted_risks_confirmed
+    - policy_snapshot_integrity
+
+  command_execution:
+    max_timeout_seconds: 1800
+    output_limit: 16384
 
   result_status:
     pass: PASS

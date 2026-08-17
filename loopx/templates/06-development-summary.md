@@ -2,19 +2,22 @@
 
 - 状态：
 - 变更文件：
-- 并行写入范围：
+- 已批准写入范围：
+- 范围外变更：
 - 实现摘要：
-- 并行任务：
+- 验收标准映射：
+- 依赖变化及批准记录：
 - 编译/测试：
 - 环境问题：
 - 剩余风险：
+- 结构化产物：`development-evidence.schema.json`
 - 下一阶段：
 
 ## stage_result
 
 ```yaml
 stage_result:
-  stage: "06 开发"
+  stage: development
   status:
   return_to:
   next_action:
@@ -24,7 +27,7 @@ stage_result:
   blocked_reason:
 ```
 
-## Evidence
+## 证据
 
 | 类型 | 命令/文件 | 结果 | 说明 |
 |---|---|---|---|

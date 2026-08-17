@@ -1,0 +1,267 @@
+catalog_version: "2"
+
+rule_sets:
+  common:
+    - COMMON-EVIDENCE-001
+  architecture:
+    - ARCH-SIMPLE-001
+    - ARCH-BOUNDARY-002
+    - ARCH-COMPAT-003
+  security:
+    - SEC-CONTROLS-001
+  performance:
+    - PERF-TARGET-001
+    - PERF-RESULT-002
+  reliability:
+    - REL-RECOVERY-001
+  observability:
+    - OBS-EVIDENCE-001
+  testing:
+    - TEST-MAPPING-001
+    - TEST-CLEANUP-002
+
+rules:
+  - id: COMMON-EVIDENCE-001
+    title: 阶段结论具有可复核证据
+    domain: common
+    source: standards/principles.md
+    stages:
+      - development
+    modes:
+      - LIGHT
+      - STANDARD
+      - FULL
+    risk_tags_any: []
+    level: required
+    check:
+      type: builtin
+      id: evidence_present
+    evidence_types:
+      - development_evidence
+    unavailable: BLOCKED
+    return_to: development
+
+  - id: ARCH-SIMPLE-001
+    title: 选择满足需求的最小方案
+    domain: architecture
+    source: standards/architecture-standard.md
+    stages:
+      - solution_review
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any: []
+    level: required
+    check:
+      type: review
+      id: solution_design_review
+    evidence_types:
+      - solution
+    unavailable: BLOCKED
+    return_to: solution_design
+
+  - id: ARCH-BOUNDARY-002
+    title: 模块和数据边界完整
+    domain: architecture
+    source: standards/architecture-standard.md
+    stages:
+      - solution_design
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any: []
+    level: required
+    check:
+      type: schema
+      id: solution_schema
+    evidence_types:
+      - solution
+    unavailable: BLOCKED
+    return_to: solution_design
+
+  - id: ARCH-COMPAT-003
+    title: 兼容和回滚策略明确
+    domain: architecture
+    source: standards/architecture-standard.md
+    stages:
+      - solution_design
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any:
+      - api_contract
+      - db_schema
+      - core_state_transition
+    level: required
+    check:
+      type: builtin
+      id: solution_compatibility
+    evidence_types:
+      - solution
+    unavailable: BLOCKED
+    return_to: solution_design
+
+  - id: SEC-CONTROLS-001
+    title: 适用安全控制均有结果
+    domain: security
+    source: standards/security-standard.md
+    stages:
+      - quality_audit
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any:
+      - auth
+      - permission
+      - tenant_scope
+      - sql
+      - dependency
+      - config_or_secret
+      - external_side_effect
+    level: required
+    check:
+      type: builtin
+      id: security_controls_by_risk
+    evidence_types:
+      - security_result
+    unavailable: BLOCKED
+    return_to: development
+
+  - id: PERF-TARGET-001
+    title: 性能目标具有来源和验证条件
+    domain: performance
+    source: standards/performance-standard.md
+    stages:
+      - solution_design
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any:
+      - performance
+    level: required
+    check:
+      type: builtin
+      id: performance_target_declared
+    evidence_types:
+      - solution
+    unavailable: BLOCKED
+    return_to: solution_design
+
+  - id: PERF-RESULT-002
+    title: 性能结果可与目标和基线比较
+    domain: performance
+    source: standards/performance-standard.md
+    stages:
+      - test_execution
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any:
+      - performance
+    level: required
+    check:
+      type: schema
+      id: performance_result_schema
+    evidence_types:
+      - performance_result
+    unavailable: CI_REQUIRED
+    return_to: test_execution
+
+  - id: REL-RECOVERY-001
+    title: 失败恢复和状态一致性明确
+    domain: reliability
+    source: standards/reliability-observability-standard.md
+    stages:
+      - solution_design
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any:
+      - reliability
+      - core_state_transition
+      - db_schema
+      - mq
+      - async
+      - external_side_effect
+    level: required
+    check:
+      type: builtin
+      id: solution_reliability
+    evidence_types:
+      - solution
+    unavailable: BLOCKED
+    return_to: solution_design
+
+  - id: OBS-EVIDENCE-001
+    title: 运行状态和未覆盖项可追踪
+    domain: observability
+    source: standards/reliability-observability-standard.md
+    stages:
+      - quality_audit
+    modes:
+      - STANDARD
+      - FULL
+    risk_tags_any:
+      - reliability
+      - mq
+      - async
+    level: required
+    check:
+      type: builtin
+      id: observability_evidence
+    evidence_types:
+      - quality_result
+    unavailable: CI_REQUIRED
+    return_to: development
+
+  - id: TEST-MAPPING-001
+    title: 测试覆盖全部验收标准和适用规则
+    domain: testing
+    source: standards/testing-standard.md
+    stages:
+      - test_design
+    modes:
+      - LIGHT
+      - STANDARD
+      - FULL
+    risk_tags_any: []
+    level: required
+    check:
+      type: builtin
+      id: test_plan_coverage
+    evidence_types:
+      - test_plan
+    unavailable: BLOCKED
+    return_to: test_design
+
+  - id: TEST-CLEANUP-002
+    title: 测试数据清理和清理验证完整
+    domain: testing
+    source: standards/testing-standard.md
+    stages:
+      - test_review
+    modes:
+      - LIGHT
+      - STANDARD
+      - FULL
+    risk_tags_any: []
+    level: required
+    check:
+      type: builtin
+      id: cleanup_plan_complete
+    evidence_types:
+      - test_plan
+    unavailable: BLOCKED
+    return_to: test_design
+
+stage_contracts:
+  solution_design:
+    - solution
+  test_design:
+    - test_plan
+  development:
+    - development_evidence
+  quality_audit:
+    - quality_result
+
+extensions: {}

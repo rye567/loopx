@@ -1,0 +1,108 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "run_id",
+    "stage",
+    "document",
+    "requirement_ids",
+    "rule_results",
+    "mappings",
+    "cases",
+    "environment"
+  ],
+  "properties": {
+    "artifact_type": {"type": "string", "enum": ["test_plan"]},
+    "artifact_version": {"type": "string", "enum": ["1"]},
+    "run_id": {"type": "string", "minLength": 1},
+    "stage": {"type": "string", "enum": ["test_design", "test_review"]},
+    "document": {"type": "string", "minLength": 1},
+    "requirement_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "rule_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "status", "evidence", "reason"],
+        "properties": {
+          "rule_id": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "CI_REQUIRED", "SKIPPED", "ACCEPTED_RISK"]},
+          "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "mappings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requirement_id", "rule_ids", "test_case_ids"],
+        "properties": {
+          "requirement_id": {"type": "string", "minLength": 1},
+          "rule_ids": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "test_case_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "covers", "risk_tags", "preconditions", "data_setup", "execution", "assertions", "cleanup", "expected_result"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "covers": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "risk_tags": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "preconditions": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "data_setup": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["run_id_strategy", "records"],
+            "properties": {
+              "run_id_strategy": {"type": "string", "minLength": 1},
+              "records": {"type": "array", "items": {"type": "string", "minLength": 1}}
+            }
+          },
+          "execution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entrypoint", "steps"],
+            "properties": {
+              "entrypoint": {"type": "string", "minLength": 1},
+              "steps": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+            }
+          },
+          "assertions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "cleanup": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["steps", "verification"],
+            "properties": {
+              "steps": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+              "verification": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+            }
+          },
+          "expected_result": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local", "ci_required", "manual"],
+      "properties": {
+        "local": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "ci_required": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "manual": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "extensions": {"type": "object"}
+  }
+}

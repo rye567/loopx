@@ -1,6 +1,6 @@
 # 08 代码审查
 
-- 状态：PASS（agent 审查通过后可进入测试执行）
+- 状态：PASS（独立审查通过后可进入测试执行）
 - Findings：
 - 开放问题：
 - 变更摘要：
@@ -12,7 +12,7 @@
 
 ```yaml
 stage_result:
-  stage: "08 代码审查"
+  stage: code_review
   status: PASS
   return_to:
   next_action: test_execution
@@ -22,7 +22,7 @@ stage_result:
   blocked_reason:
 ```
 
-## Evidence
+## 证据
 
 | 类型 | 命令/文件 | 结果 | 说明 |
 |---|---|---|---|

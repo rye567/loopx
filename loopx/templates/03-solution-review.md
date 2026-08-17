@@ -1,6 +1,6 @@
 # 03 方案审核
 
-- 状态：NEED_HUMAN（agent 审核通过后等待用户确认）
+- 状态：NEED_HUMAN（独立审核通过后等待用户确认）
 - 审核结论：
 - 问题列表：
 - 项目规则符合性：
@@ -12,7 +12,7 @@
 
 ```yaml
 stage_result:
-  stage: "03 方案审核"
+  stage: solution_review
   status: NEED_HUMAN
   return_to:
   next_action: confirm-stage --stage solution_review
@@ -22,7 +22,7 @@ stage_result:
   blocked_reason:
 ```
 
-## Evidence
+## 证据
 
 | 类型 | 命令/文件 | 结果 | 说明 |
 |---|---|---|---|
