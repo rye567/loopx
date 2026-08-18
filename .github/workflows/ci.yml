@@ -19,7 +19,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: 安装开发工具
-        run: pip install ruff coverage
+        # coverage[toml]：Python 3.10 无内置 tomllib，读取 pyproject.toml 配置需要 tomli。
+        run: pip install ruff "coverage[toml]"
       - name: Lint（ruff）
         run: ruff check loopx/tools tests scripts
       - name: 运行单元测试（带覆盖率）
