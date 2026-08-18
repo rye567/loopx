@@ -4,6 +4,29 @@ All notable changes to LoopX are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-18
+
+### Added
+
+- **Python engineering baseline**: `pyproject.toml` with dev tooling config (ruff, coverage, jsonschema) — runtime stays stdlib-only.
+- **CI upgrade**: Python 3.10/3.12/3.13 test matrix, ruff lint step, coverage reporting with an 80% floor (measured baseline 83%).
+- **Schema standardization**: all 17 schemas declare `$schema` (draft-07); new `scripts/validate_schemas.py` validates schemas with the standard `jsonschema` library in CI and keeps them compatible with the built-in lightweight validator.
+- **Release tag check**: new CI `release` job verifies on tag pushes (`vX.Y.Z`) that the tag matches both `manifest.json` and `loopx/manifest.json` versions; plain pushes and PRs skip it.
+
+### Changed
+
+- **Module split of large files** (behavior unchanged, public APIs re-exported in place):
+  - `loopx_controller.py` no longer star-imports; explicit re-exports only.
+  - `loopx_controller_core.py` (879 → 396 lines) split into CLI assembly (`loopx_controller_cli.py`) and requirement-intake commands (`loopx_controller_intake.py`).
+  - `loopx_health.py` (758 → 176 lines) split into base contracts, core checkers, and safe project-command execution.
+  - `loopx_controller_evidence.py` (706 → 290 lines) split into shared constants/file resolution, per-artifact semantic validators, and work-item validation.
+- README workflow diagrams (EN/ZH) now include quality audit, health check, and final report, matching the mermaid graph.
+
+### Fixed
+
+- `tests/test_loopx_policy.py` builds snapshots in an isolated temp project instead of the repo root, which started detecting the repo's own `pyproject.toml` via project-profile auto-detection and drifted expectations.
+- CI installs `coverage[toml]`: bare `coverage` cannot read `pyproject.toml` config on Python 3.10 (no stdlib `tomllib`).
+
 ## [0.1.1] - 2026-08-07
 
 ### Fixed
