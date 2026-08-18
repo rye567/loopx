@@ -11,3 +11,6 @@ CLAUDE.md
 .loopx/
 # LoopX 运行状态（机器生成，非人工文档，不进版本库）
 docs/loopx/runs/
+
+# uv 本地验证产生的临时锁文件（CI 用 pip 安装，不用 uv 锁）
+uv.lock
