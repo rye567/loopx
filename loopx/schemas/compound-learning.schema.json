@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": [
     "schema_version",
@@ -23,7 +24,10 @@
     },
     "decision": {
       "type": "string",
-      "enum": ["captured", "skipped"]
+      "enum": [
+        "captured",
+        "skipped"
+      ]
     },
     "category": {
       "type": "string"

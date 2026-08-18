@@ -54,9 +54,12 @@ AI 编程 Agent 很快，但常见问题也很明显：跳过需求澄清、臆�
   -> 测试设计
   -> 测试评审
   -> 实现
+  -> 通用质量审计
   -> 代码评审
-  -> 验证
+  -> 测试执行（验证）
+  -> 健康检查
   -> 发布准备
+  -> 最终报告
 ```
 
 完整流程契约见 [`loopx/workflow.md`](loopx/workflow.md)。新运行默认保存在操作系统的用户状态目录中，每个运行静稳时只有一个 `<project-id>/<run_id>/run.json`，项目内不生成流程控制 JSON；`state.json`、工作清单、事件、阶段结果和自动产物仍以逻辑文件形式收纳在该容器中，所以阶段与检查功能不变。`LOOPX_STATE_DIR` 可覆盖状态根目录，`LOOPX_STATE_BACKEND=project` 可显式使用旧项目目录格式；已有 `docs/loopx/runs/<run_id>/` 运行会继续按旧格式读取，不自动迁移或删除。LoopX 也会在收口前记录经验沉淀决定：没有复用价值时选择 skipped，有价值且显式允许时以 captured 形式写入 `docs/loopx/solutions/<category>/<slug>.md`。

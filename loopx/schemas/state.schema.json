@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": [
     "run_id",
@@ -15,7 +16,10 @@
   "properties": {
     "contract_version": {
       "type": "string",
-      "enum": ["1", "2"]
+      "enum": [
+        "1",
+        "2"
+      ]
     },
     "catalog_version": {
       "type": "string"
@@ -34,11 +38,20 @@
     },
     "mode": {
       "type": "string",
-      "enum": ["LIGHT", "STANDARD", "FULL"]
+      "enum": [
+        "LIGHT",
+        "STANDARD",
+        "FULL"
+      ]
     },
     "status": {
       "type": "string",
-      "enum": ["ACTIVE", "PASS", "BLOCKED", "LOCAL_INCOMPLETE_CI_REQUIRED"]
+      "enum": [
+        "ACTIVE",
+        "PASS",
+        "BLOCKED",
+        "LOCAL_INCOMPLETE_CI_REQUIRED"
+      ]
     },
     "current_stage": {
       "type": "string"

@@ -138,6 +138,10 @@ class LoopxSkillPackageTest(unittest.TestCase):
         root_manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
         loopx_manifest = json.loads((LOOPX / "manifest.json").read_text(encoding="utf-8"))
 
+        # 双 manifest 的版本号必须一致且非空，防止发版时只改了一处。
+        self.assertTrue(root_manifest.get("version"))
+        self.assertEqual(root_manifest["version"], loopx_manifest.get("version"))
+
         for manifest in (root_manifest, loopx_manifest):
             self.assertNotIn("install", manifest)
             self.assertNotIn("syncCommand", manifest)

@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": [
     "recommended",
@@ -11,18 +12,28 @@
   "properties": {
     "recommended": {
       "type": "string",
-      "enum": ["LIGHT", "STANDARD", "FULL"]
+      "enum": [
+        "LIGHT",
+        "STANDARD",
+        "FULL"
+      ]
     },
     "selected": {
       "type": "string"
     },
     "selection_status": {
       "type": "string",
-      "enum": ["NEED_HUMAN", "CONFIRMED"]
+      "enum": [
+        "NEED_HUMAN",
+        "CONFIRMED"
+      ]
     },
     "selected_by": {
       "type": "string",
-      "enum": ["auto", "user"]
+      "enum": [
+        "auto",
+        "user"
+      ]
     },
     "reason": {
       "type": "array",
@@ -32,7 +43,10 @@
     },
     "accepted_risk": {
       "type": "object",
-      "required": ["selected_lower_than_recommended", "reason"],
+      "required": [
+        "selected_lower_than_recommended",
+        "reason"
+      ],
       "properties": {
         "selected_lower_than_recommended": {
           "type": "boolean"

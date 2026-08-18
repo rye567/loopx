@@ -7,12 +7,38 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # 矩阵覆盖下限版本（requires-python >= 3.10）与主流新版本，
+      # 避免单一浮动版本在未来 Python 发布时意外踩坑。
+      matrix:
+        python-version: ['3.10', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
-      - name: 运行单元测试
-        run: python -m unittest discover -s tests
+          python-version: ${{ matrix.python-version }}
+      - name: 安装开发工具
+        run: pip install ruff coverage
+      - name: Lint（ruff）
+        run: ruff check loopx/tools tests scripts
+      - name: 运行单元测试（带覆盖率）
+        run: coverage run -m unittest discover -s tests
+      - name: 覆盖率摘要
+        run: coverage report
       - name: 运行 LoopX package harness
         run: python loopx/tools/loopx_check.py package --root .
+
+  schema:
+    # 开发时用标准 jsonschema 库完整校验 schemas/；
+    # 运行时控制器仍用自研轻量校验器，保持零依赖分发。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安装 jsonschema
+        run: pip install jsonschema
+      - name: 校验 schema 文件与示例产物
+        run: python scripts/validate_schemas.py

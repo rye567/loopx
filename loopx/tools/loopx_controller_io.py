@@ -12,6 +12,9 @@ from loopx_controller_yaml import parse_yaml_subset
 
 
 SUPPORTED_SCHEMA_KEYWORDS = {
+    # "$schema" 仅声明标准方言（draft-07），自研校验器不做解释；
+    # 兼容它是为了让 schema 文件能被标准 JSON Schema 工具识别。
+    "$schema",
     "type",
     "enum",
     "required",

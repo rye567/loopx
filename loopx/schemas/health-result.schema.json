@@ -1,19 +1,34 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["run_id", "status", "checks", "ci_gap_declared"],
+  "required": [
+    "run_id",
+    "status",
+    "checks",
+    "ci_gap_declared"
+  ],
   "properties": {
     "run_id": {
       "type": "string"
     },
     "status": {
       "type": "string",
-      "enum": ["PASS", "PASS_WITH_WARNINGS", "LOCAL_INCOMPLETE_CI_REQUIRED", "BLOCKED"]
+      "enum": [
+        "PASS",
+        "PASS_WITH_WARNINGS",
+        "LOCAL_INCOMPLETE_CI_REQUIRED",
+        "BLOCKED"
+      ]
     },
     "checks": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "status", "evidence"],
+        "required": [
+          "name",
+          "status",
+          "evidence"
+        ],
         "properties": {
           "name": {
             "type": "string"

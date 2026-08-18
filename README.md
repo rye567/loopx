@@ -54,9 +54,12 @@ request
   -> test design
   -> test review
   -> implementation
+  -> quality audit
   -> code review
-  -> validation
+  -> validation (test execution)
+  -> health check
   -> release readiness
+  -> final report
 ```
 
 The workflow contract lives in [`loopx/workflow.md`](loopx/workflow.md). New runs are stored in the platform user-state directory as one `<project-id>/<run_id>/run.json` file at rest, so the project receives no workflow-control JSON. The existing logical state, worklist, event, stage-result, and generated-artifact files remain inside that container, preserving controller behavior. `LOOPX_STATE_DIR` overrides the state root and `LOOPX_STATE_BACKEND=project` selects the legacy project-directory backend; existing `docs/loopx/runs/<run_id>/` runs remain readable in place and are never migrated or deleted automatically. LoopX can also record a Compound Capture decision before close: skipped when there is no reusable learning, or captured into `docs/loopx/solutions/<category>/<slug>.md` when explicitly enabled.

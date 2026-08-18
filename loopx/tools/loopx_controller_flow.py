@@ -334,7 +334,6 @@ def _record_v2_stage_result(
     # 延迟导入避免 evidence -> policy/io 与 flow 的模块初始化形成环。
     from loopx_controller_evidence import prepare_v2_stage_record
 
-    directory = get_run_dir(project, run_id)
     try:
         worklist_path, worklist = load_worklist(project, state)
     except (FileNotFoundError, YamlSubsetError) as exc:

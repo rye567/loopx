@@ -1,0 +1,38 @@
+[project]
+name = "loopx-tools"
+version = "0.1.1"
+description = "LoopX staged workflow controller tools (runtime: stdlib only)"
+requires-python = ">=3.10"
+
+# 说明：本仓库是 skill 分发仓库，不打 PyPI 包、不安装运行时依赖；
+# 此文件只承载开发时工具配置（lint/测试/覆盖率），不影响分发后的零依赖特性。
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "coverage>=7.6",
+    "jsonschema>=4.23",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+# 只检查源码与测试；docs/ 与生成产物不参与
+include = ["loopx/tools/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
+exclude = ["docs", ".uv-cache"]
+
+[tool.ruff.lint]
+# 起步阶段只启用保守规则集，避免一次性大规模改代码；
+# 后续可逐步启用 E/F 之外的 I（import 排序）、UP（语法升级）等。
+select = ["E4", "E7", "E9", "F"]
+
+[tool.coverage.run]
+source = ["loopx/tools"]
+command_line = "-m unittest discover -s tests"
+
+[tool.coverage.report]
+# 实测基线：总体 83%（unittest discover，本地 Python 3.13 全量通过时）。
+# 门槛设在 80%：留 3 个百分点容差防止小幅波动误伤 CI；覆盖率系统性提升后再上调。
+fail_under = 80
+show_missing = true

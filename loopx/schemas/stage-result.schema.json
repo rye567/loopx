@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": [
     "stage",
@@ -13,14 +14,24 @@
   "properties": {
     "contract_version": {
       "type": "string",
-      "enum": ["1", "2"]
+      "enum": [
+        "1",
+        "2"
+      ]
     },
     "stage": {
       "type": "string"
     },
     "status": {
       "type": "string",
-      "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK", "NEED_HUMAN"]
+      "enum": [
+        "PASS",
+        "CHANGES_REQUIRED",
+        "BLOCKED",
+        "SKIPPED",
+        "ACCEPTED_RISK",
+        "NEED_HUMAN"
+      ]
     },
     "mode": {
       "type": "string"
@@ -51,11 +62,21 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["type", "path"],
+        "required": [
+          "type",
+          "path"
+        ],
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["solution", "test_plan", "development_evidence", "quality_result", "performance_result", "security_result"]
+            "enum": [
+              "solution",
+              "test_plan",
+              "development_evidence",
+              "quality_result",
+              "performance_result",
+              "security_result"
+            ]
           },
           "path": {
             "type": "string",
@@ -69,19 +90,39 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["rule_id", "status", "evidence", "reason"],
+        "required": [
+          "rule_id",
+          "status",
+          "evidence",
+          "reason"
+        ],
         "properties": {
-          "rule_id": {"type": "string", "minLength": 1},
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
           "status": {
             "type": "string",
-            "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "CI_REQUIRED", "SKIPPED", "ACCEPTED_RISK"]
+            "enum": [
+              "PASS",
+              "CHANGES_REQUIRED",
+              "BLOCKED",
+              "CI_REQUIRED",
+              "SKIPPED",
+              "ACCEPTED_RISK"
+            ]
           },
           "evidence": {
             "type": "array",
             "minItems": 1,
-            "items": {"type": "string", "minLength": 1}
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "reason": {"type": "string"}
+          "reason": {
+            "type": "string"
+          }
         }
       }
     },

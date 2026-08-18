@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": [
     "status",
@@ -9,7 +10,14 @@
   "properties": {
     "status": {
       "type": "string",
-      "enum": ["NOT_CREATED", "DRAFT", "APPROVED", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN"]
+      "enum": [
+        "NOT_CREATED",
+        "DRAFT",
+        "APPROVED",
+        "CHANGES_REQUIRED",
+        "BLOCKED",
+        "NEED_HUMAN"
+      ]
     },
     "artifact": {
       "type": "string"
@@ -19,7 +27,14 @@
     },
     "gate_result": {
       "type": "string",
-      "enum": ["PENDING", "PASS", "CHANGES_REQUIRED", "BLOCKED", "NEED_HUMAN", "SKIPPED"]
+      "enum": [
+        "PENDING",
+        "PASS",
+        "CHANGES_REQUIRED",
+        "BLOCKED",
+        "NEED_HUMAN",
+        "SKIPPED"
+      ]
     },
     "required_sections": {
       "type": "array",

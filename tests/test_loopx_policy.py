@@ -105,19 +105,24 @@ class PolicyTest(unittest.TestCase):
         self.assertIn("未知规则集合", "\n".join(validate_risk_profiles(self.catalog, dangling)))
 
     def test_mode_and_risk_rule_selection(self):
-        cases = [
-            ("LIGHT", ["docs_only"], {"common"}, {"COMMON-EVIDENCE-001"}),
-            ("STANDARD", ["performance"], {"common", "performance", "testing"}, {"PERF-TARGET-001", "TEST-MAPPING-001"}),
-            ("FULL", ["core_state_transition"], {"common", "architecture", "reliability", "testing"}, {"ARCH-SIMPLE-001", "REL-RECOVERY-001"}),
-        ]
-        for mode, tags, expected_sets, expected_rules in cases:
-            with self.subTest(mode=mode, tags=tags):
-                snapshot = build_policy_snapshot(ROOT, mode, tags)
-                self.assertEqual(set(snapshot["rule_sets"]), expected_sets)
-                selected = {rule["id"] for rule in snapshot["rules"]}
-                self.assertTrue(expected_rules.issubset(selected))
-                if tags == ["docs_only"]:
-                    self.assertNotIn("SEC-CONTROLS-001", selected)
+        # 用隔离的空项目目录构建快照：本测试只验证模式与风险标签的规则选择，
+        # 不能依赖仓库根目录自身的特征文件（如 pyproject.toml），
+        # 否则会命中 project-profiles 的自动检测导致期望值漂移。
+        with tempfile.TemporaryDirectory(prefix="loopx-policy-") as raw:
+            isolated = Path(raw)
+            cases = [
+                ("LIGHT", ["docs_only"], {"common"}, {"COMMON-EVIDENCE-001"}),
+                ("STANDARD", ["performance"], {"common", "performance", "testing"}, {"PERF-TARGET-001", "TEST-MAPPING-001"}),
+                ("FULL", ["core_state_transition"], {"common", "architecture", "reliability", "testing"}, {"ARCH-SIMPLE-001", "REL-RECOVERY-001"}),
+            ]
+            for mode, tags, expected_sets, expected_rules in cases:
+                with self.subTest(mode=mode, tags=tags):
+                    snapshot = build_policy_snapshot(isolated, mode, tags)
+                    self.assertEqual(set(snapshot["rule_sets"]), expected_sets)
+                    selected = {rule["id"] for rule in snapshot["rules"]}
+                    self.assertTrue(expected_rules.issubset(selected))
+                    if tags == ["docs_only"]:
+                        self.assertNotIn("SEC-CONTROLS-001", selected)
 
     def test_policy_precedence_and_downgrade(self):
         with tempfile.TemporaryDirectory(prefix="loopx-std-") as raw:

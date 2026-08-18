@@ -9,7 +9,6 @@ from pathlib import Path
 from loopx_controller_io import load_schema, loopx_root, project_path, validate_schema
 from loopx_controller_store import runtime_relative_path
 from loopx_controller_policy import (
-    CONTRACT_VERSION,
     load_policy_snapshot,
     required_artifacts_for_stage,
     rules_for_stage,

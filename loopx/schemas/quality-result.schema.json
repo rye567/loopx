@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,52 +16,157 @@
     "diff_scope"
   ],
   "properties": {
-    "artifact_type": {"type": "string", "enum": ["quality_result"]},
-    "artifact_version": {"type": "string", "enum": ["1"]},
-    "run_id": {"type": "string", "minLength": 1},
-    "stage": {"type": "string", "enum": ["quality_audit", "test_execution"]},
-    "document": {"type": "string", "minLength": 1},
-    "requirement_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "quality_result"
+      ]
+    },
+    "artifact_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "quality_audit",
+        "test_execution"
+      ]
+    },
+    "document": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requirement_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "rule_results": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["rule_id", "status", "evidence", "reason"],
+        "required": [
+          "rule_id",
+          "status",
+          "evidence",
+          "reason"
+        ],
         "properties": {
-          "rule_id": {"type": "string", "minLength": 1},
-          "status": {"type": "string", "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "CI_REQUIRED", "SKIPPED", "ACCEPTED_RISK"]},
-          "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-          "reason": {"type": "string"}
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "CHANGES_REQUIRED",
+              "BLOCKED",
+              "CI_REQUIRED",
+              "SKIPPED",
+              "ACCEPTED_RISK"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
         }
       }
     },
-    "unresolved_items": {"type": "array", "items": {"type": "string", "minLength": 1}},
-    "ci_gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "unresolved_items": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ci_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "accepted_risks": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["rule_id", "reason", "confirmation_evidence"],
+        "required": [
+          "rule_id",
+          "reason",
+          "confirmation_evidence"
+        ],
         "properties": {
-          "rule_id": {"type": "string", "minLength": 1},
-          "reason": {"type": "string", "minLength": 1},
-          "confirmation_evidence": {"type": "string", "minLength": 1}
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirmation_evidence": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
     "diff_scope": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["allowed", "actual", "outside"],
+      "required": [
+        "allowed",
+        "actual",
+        "outside"
+      ],
       "properties": {
-        "allowed": {"type": "array", "items": {"type": "string", "minLength": 1}},
-        "actual": {"type": "array", "items": {"type": "string", "minLength": 1}},
-        "outside": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        "allowed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "actual": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "outside": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     },
-    "extensions": {"type": "object"}
+    "extensions": {
+      "type": "object"
+    }
   }
 }

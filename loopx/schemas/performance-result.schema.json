@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,24 +13,79 @@
     "metrics"
   ],
   "properties": {
-    "artifact_type": {"type": "string", "enum": ["performance_result"]},
-    "artifact_version": {"type": "string", "enum": ["1"]},
-    "run_id": {"type": "string", "minLength": 1},
-    "stage": {"type": "string", "enum": ["test_execution"]},
-    "document": {"type": "string", "minLength": 1},
-    "requirement_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "performance_result"
+      ]
+    },
+    "artifact_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "test_execution"
+      ]
+    },
+    "document": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requirement_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "rule_results": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["rule_id", "status", "evidence", "reason"],
+        "required": [
+          "rule_id",
+          "status",
+          "evidence",
+          "reason"
+        ],
         "properties": {
-          "rule_id": {"type": "string", "minLength": 1},
-          "status": {"type": "string", "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "CI_REQUIRED", "SKIPPED", "ACCEPTED_RISK"]},
-          "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-          "reason": {"type": "string"}
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "CHANGES_REQUIRED",
+              "BLOCKED",
+              "CI_REQUIRED",
+              "SKIPPED",
+              "ACCEPTED_RISK"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
         }
       }
     },
@@ -53,20 +109,65 @@
           "evidence"
         ],
         "properties": {
-          "metric": {"type": "string", "minLength": 1},
-          "unit": {"type": "string", "minLength": 1},
-          "target": {"type": "string", "minLength": 1},
-          "target_source": {"type": "string", "minLength": 1},
-          "load": {"type": "string", "minLength": 1},
-          "environment": {"type": "string", "minLength": 1},
-          "baseline": {"type": "string", "minLength": 1},
-          "actual": {"type": "string", "minLength": 1},
-          "allowed_variation": {"type": "string", "minLength": 1},
-          "status": {"type": "string", "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED", "CI_REQUIRED", "SKIPPED"]},
-          "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "load": {
+            "type": "string",
+            "minLength": 1
+          },
+          "environment": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline": {
+            "type": "string",
+            "minLength": 1
+          },
+          "actual": {
+            "type": "string",
+            "minLength": 1
+          },
+          "allowed_variation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "CHANGES_REQUIRED",
+              "BLOCKED",
+              "CI_REQUIRED",
+              "SKIPPED"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
-    "extensions": {"type": "object"}
+    "extensions": {
+      "type": "object"
+    }
   }
 }
