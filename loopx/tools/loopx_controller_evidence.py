@@ -1,90 +1,35 @@
 #!/usr/bin/env python3
-"""LoopX v2 阶段产物、证据路径、规则结果和工作项校验。"""
+"""LoopX v2 阶段记录准备与严格复检。
+
+ 本模块负责“任何持久化前”的完整校验（``prepare_v2_stage_record``）和
+ 严格检查时的复检（``validate_recorded_v2_stage``）；
+ 共享常量与文件解析在 ``_evidence_shared``，语义校验在
+ ``_evidence_semantics``，工作项校验在 ``_evidence_workitems``。
+ 对外公共 API 由文件末尾的 re-export 保持不变。
+"""
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-from loopx_controller_io import load_schema, loopx_root, project_path, validate_schema
-from loopx_controller_store import runtime_relative_path
+from loopx_controller_io import load_schema, loopx_root, validate_schema
 from loopx_controller_policy import (
     load_policy_snapshot,
     required_artifacts_for_stage,
     rules_for_stage,
 )
-
-
-ARTIFACT_SCHEMAS = {
-    "solution": "solution",
-    "test_plan": "test-plan",
-    "development_evidence": "development-evidence",
-    "quality_result": "quality-result",
-    "performance_result": "performance-result",
-    "security_result": "security-result",
-}
-ARTIFACT_VERSION = "1"
-RULE_RESULT_STATUSES = {
-    "PASS",
-    "CHANGES_REQUIRED",
-    "ACCEPTED_RISK",
-    "CI_REQUIRED",
-    "SKIPPED",
-    "BLOCKED",
-}
-WORK_ITEM_INPUT_FIELDS = {
-    "id",
-    "title",
-    "owner_agent",
-    "risk_tags",
-    "read_scope",
-    "write_scope",
-    "dependencies",
-    "validation",
-}
-WORK_ITEM_LIST_FIELDS = {"risk_tags", "read_scope", "write_scope", "dependencies", "validation"}
-
-
-def resolve_project_file(project, raw_path, label="文件"):
-    """解析项目内普通文件并返回基于真实路径的相对路径。"""
-
-    if not isinstance(raw_path, str) or not raw_path.strip():
-        raise ValueError(f"{label}路径不能为空")
-    candidate = Path(raw_path)
-    if candidate.is_absolute():
-        raise ValueError(f"{label}必须使用项目内相对路径：{raw_path}")
-    root = Path(project).resolve(strict=True)
-    try:
-        resolved = project_path(root, candidate).resolve(strict=True)
-    except FileNotFoundError as exc:
-        raise ValueError(f"{label}不存在：{raw_path}") from exc
-    runtime_relative = runtime_relative_path(root, resolved)
-    if runtime_relative is not None:
-        relative = Path(runtime_relative)
-    else:
-        try:
-            relative = resolved.relative_to(root)
-        except ValueError as exc:
-            raise ValueError(f"{label}解析后超出项目根目录：{raw_path}") from exc
-    if not resolved.is_file():
-        raise ValueError(f"{label}必须是普通文件：{raw_path}")
-    return relative.as_posix(), resolved
-
-
-def parse_artifact_arguments(values):
-    artifacts = {}
-    for value in values or []:
-        if not isinstance(value, str) or "=" not in value:
-            raise ValueError("--artifact 必须使用“类型=项目内相对路径”格式")
-        artifact_type, raw_path = (part.strip() for part in value.split("=", 1))
-        if artifact_type not in ARTIFACT_SCHEMAS:
-            raise ValueError(f"未知产物类型：{artifact_type}")
-        if not raw_path:
-            raise ValueError(f"产物 {artifact_type} 的路径不能为空")
-        if artifact_type in artifacts:
-            raise ValueError(f"产物类型重复：{artifact_type}")
-        artifacts[artifact_type] = raw_path
-    return artifacts
+from loopx_controller_evidence_shared import (
+    ARTIFACT_SCHEMAS,
+    ARTIFACT_VERSION,
+    RULE_RESULT_STATUSES,
+    resolve_project_file,
+)
+from loopx_controller_evidence_semantics import SEMANTIC_VALIDATORS
+from loopx_controller_evidence_workitems import (
+    WORK_ITEM_INPUT_FIELDS,
+    runtime_work_items,
+    validate_work_item_references,
+)
 
 
 def _read_json_artifact(path, label):
@@ -102,384 +47,6 @@ def _load_artifact_schema(artifact_type):
     if not path.is_file():
         raise ValueError(f"缺少产物结构定义：{path.name}")
     return load_schema(name)
-
-
-def _not_applicable(value):
-    if not isinstance(value, dict):
-        return False
-    status = str(value.get("status") or value.get("applicability") or "").upper().replace("-", "_")
-    return status in {"N/A", "NA", "NOT_APPLICABLE", "SKIPPED"} or value.get("applicable") is False
-
-
-def _reason(value):
-    if not isinstance(value, dict):
-        return ""
-    return str(value.get("reason") or value.get("not_applicable_reason") or value.get("rationale") or "").strip()
-
-
-def _quality_attributes(artifact):
-    value = artifact.get("quality_attributes") or artifact.get("qualities") or {}
-    return value if isinstance(value, dict) else {}
-
-
-def _find_attribute(attributes, *names):
-    for name in names:
-        if name in attributes:
-            return attributes[name]
-    return None
-
-
-def _require_nonempty(value, path, errors):
-    if value is None or value == "" or value == [] or value == {}:
-        errors.append(f"{path} 不能为空")
-
-
-def validate_solution_semantics(artifact, risk_tags=None):
-    errors = []
-    attributes = _quality_attributes(artifact)
-    dimensions = {
-        "simplicity": ("simplicity", "simple_design"),
-        "module_boundaries": ("module_boundaries", "boundaries", "architecture_boundaries"),
-        "security": ("security",),
-        "performance": ("performance",),
-        "extensibility": ("extensibility",),
-        "compatibility": ("compatibility",),
-        "reliability": ("reliability",),
-        "observability": ("observability",),
-    }
-    for display, aliases in dimensions.items():
-        value = _find_attribute(attributes, *aliases)
-        if value is None:
-            errors.append(f"solution.quality_attributes 缺少 {display}")
-            continue
-        if not isinstance(value, dict):
-            errors.append(f"solution.quality_attributes.{display} 必须是对象")
-            continue
-        required_fields = {"status", "approach", "reason", "evidence"}
-        unknown = set(value) - required_fields
-        missing = required_fields - set(value)
-        if unknown:
-            errors.append(f"solution.quality_attributes.{display} 包含未知字段：{', '.join(sorted(unknown))}")
-        if missing:
-            errors.append(f"solution.quality_attributes.{display} 缺少字段：{', '.join(sorted(missing))}")
-        if value.get("status") not in {"APPLICABLE", "NOT_APPLICABLE"}:
-            errors.append(f"solution.quality_attributes.{display}.status 不合法")
-        if not isinstance(value.get("approach"), str):
-            errors.append(f"solution.quality_attributes.{display}.approach 必须是字符串")
-        if not isinstance(value.get("reason"), str):
-            errors.append(f"solution.quality_attributes.{display}.reason 必须是字符串")
-        evidence = value.get("evidence")
-        if not isinstance(evidence, list) or any(not isinstance(item, str) or not item for item in evidence):
-            errors.append(f"solution.quality_attributes.{display}.evidence 必须是字符串数组")
-        if value.get("status") == "APPLICABLE":
-            _require_nonempty(value.get("approach"), f"solution.quality_attributes.{display}.approach", errors)
-            _require_nonempty(evidence, f"solution.quality_attributes.{display}.evidence", errors)
-        if _not_applicable(value) and len(_reason(value)) < 3:
-            errors.append(f"solution.quality_attributes.{display} 标记不适用时必须提供具体理由")
-
-    tags = set(risk_tags or [])
-    rollback = artifact.get("rollback")
-    if not isinstance(rollback, dict):
-        errors.append("solution.rollback 必须是对象")
-    else:
-        has_strategy = bool(rollback.get("strategy") or rollback.get("steps") or rollback.get("validation"))
-        if has_strategy:
-            for field in ("strategy", "steps", "validation"):
-                _require_nonempty(rollback.get(field), f"solution.rollback.{field}", errors)
-        elif len(_reason(rollback)) < 3:
-            errors.append("solution.rollback 不适用时必须提供具体理由")
-
-    if "performance" in tags:
-        targets = artifact.get("performance_targets") or []
-        if not isinstance(targets, list) or not targets:
-            errors.append("命中 performance 风险时必须提供 performance_targets")
-        else:
-            required = (
-                "metric",
-                "unit",
-                "target",
-                "target_source",
-                "load",
-                "environment",
-                "baseline",
-                "allowed_variation",
-                "evidence",
-            )
-            for index, target in enumerate(targets):
-                if not isinstance(target, dict):
-                    errors.append(f"solution.performance_targets[{index}] 必须是对象")
-                    continue
-                for field in required:
-                    _require_nonempty(target.get(field), f"solution.performance_targets[{index}].{field}", errors)
-    return errors
-
-
-def _mapping_ids(value, id_keys):
-    if isinstance(value, dict):
-        return {str(key) for key in value}
-    result = set()
-    if isinstance(value, list):
-        for item in value:
-            if isinstance(item, str):
-                result.add(item)
-            elif isinstance(item, dict):
-                for key in id_keys:
-                    if item.get(key):
-                        result.add(str(item[key]))
-                        break
-    return result
-
-
-def validate_test_plan_semantics(artifact, required_rule_ids=None):
-    errors = []
-    requirement_ids = {str(item) for item in artifact.get("requirement_ids") or []}
-    acceptance = artifact.get("mappings") or artifact.get("acceptance_criteria") or artifact.get("acceptance_mappings")
-    covered_acceptance = _mapping_ids(acceptance, ("requirement_id", "acceptance_id", "id"))
-    if requirement_ids and not requirement_ids.issubset(covered_acceptance):
-        missing = sorted(requirement_ids - covered_acceptance)
-        errors.append(f"test_plan 未覆盖验收/需求标识：{', '.join(missing)}")
-
-    rule_mapping = artifact.get("mappings") or artifact.get("rule_mappings") or artifact.get("rule_coverage")
-    covered_rules = set()
-    if isinstance(rule_mapping, list):
-        for mapping in rule_mapping:
-            if isinstance(mapping, dict):
-                covered_rules.update(str(item) for item in mapping.get("rule_ids") or [])
-    required_rule_ids = set(required_rule_ids or [])
-    if required_rule_ids and not required_rule_ids.issubset(covered_rules):
-        errors.append(f"test_plan 未覆盖必需规则：{', '.join(sorted(required_rule_ids - covered_rules))}")
-
-    cases = artifact.get("cases") or artifact.get("test_cases") or []
-    if not isinstance(cases, list) or not cases:
-        errors.append("test_plan.test_cases 至少需要一个测试用例")
-        return errors
-    case_ids = [case.get("id") for case in cases if isinstance(case, dict) and case.get("id")]
-    if len(case_ids) != len(set(case_ids)):
-        errors.append("test_plan.test_cases 包含重复 ID")
-    cases_by_id = {
-        case["id"]: case for case in cases
-        if isinstance(case, dict) and isinstance(case.get("id"), str) and case.get("id")
-    }
-    for index, mapping in enumerate(artifact.get("mappings") or []):
-        if not isinstance(mapping, dict):
-            continue
-        requirement_id = mapping.get("requirement_id")
-        for test_case_id in mapping.get("test_case_ids") or []:
-            case = cases_by_id.get(test_case_id)
-            if case is None:
-                errors.append(f"test_plan.mappings[{index}] 引用了未知测试用例：{test_case_id}")
-            elif requirement_id not in (case.get("covers") or []):
-                errors.append(f"测试用例 {test_case_id} 未声明覆盖 {requirement_id}")
-    lifecycle = {
-        "data_setup": ("data_setup", "setup"),
-        "execution": ("execution",),
-        "assertions": ("assertions",),
-        "cleanup": ("cleanup",),
-    }
-    for index, case in enumerate(cases):
-        if not isinstance(case, dict):
-            errors.append(f"test_plan.test_cases[{index}] 必须是对象")
-            continue
-        for name, aliases in lifecycle.items():
-            value = next((case.get(key) for key in aliases if key in case), None)
-            if value in (None, "", [], {}):
-                errors.append(f"test_plan.test_cases[{index}].{name} 不能为空")
-        execution = case.get("execution") or {}
-        if not execution.get("entrypoint") or not execution.get("steps"):
-            errors.append(f"test_plan.test_cases[{index}].execution 必须包含入口和步骤")
-        cleanup = case.get("cleanup") or {}
-        if not cleanup.get("steps") or not cleanup.get("verification"):
-            errors.append(f"test_plan.test_cases[{index}].cleanup 必须包含清理动作和清理验证")
-    return errors
-
-
-def validate_security_semantics(artifact, risk_tags=None):
-    security_tags = {"auth", "permission", "tenant_scope", "config_or_secret", "dependency", "external_side_effect"}
-    tags = security_tags.intersection(set(risk_tags or []))
-    if not tags:
-        return []
-    controls = artifact.get("controls") or artifact.get("control_results") or []
-    if not isinstance(controls, list) or not controls:
-        return ["security_result.controls 缺少适用安全控制结果"]
-    errors = []
-    required_controls = {"input", "sensitive_data", "dependency"}
-    mapping = {
-        "auth": "identity",
-        "permission": "permission",
-        "tenant_scope": "tenant_scope",
-        "config_or_secret": "sensitive_data",
-        "dependency": "dependency",
-        "external_side_effect": "external_side_effect",
-    }
-    required_controls.update(mapping[tag] for tag in tags)
-    actual_controls = {
-        item.get("control") for item in controls if isinstance(item, dict) and item.get("control")
-    }
-    missing = sorted(required_controls - actual_controls)
-    if missing:
-        errors.append(f"security_result 缺少适用控制：{', '.join(missing)}")
-    for index, control in enumerate(controls):
-        if not isinstance(control, dict):
-            errors.append(f"security_result.controls[{index}] 必须是对象")
-            continue
-        status = str(control.get("status") or "")
-        if status not in {"PASS", "CHANGES_REQUIRED", "CI_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK"}:
-            errors.append(f"security_result.controls[{index}].status 不合法")
-        if status == "PASS" and not (control.get("evidence") or []):
-            errors.append(f"security_result.controls[{index}] 通过时必须提供证据")
-        remaining = str(control.get("remaining_risk") or _reason(control)).strip()
-        if status in {"CHANGES_REQUIRED", "CI_REQUIRED", "BLOCKED", "SKIPPED", "ACCEPTED_RISK"} and len(remaining) < 3:
-            errors.append(f"security_result.controls[{index}] 未完成时必须提供具体理由")
-    return errors
-
-
-def validate_performance_semantics(artifact):
-    metrics = artifact.get("metrics") or []
-    if not isinstance(metrics, list) or not metrics:
-        return ["performance_result.metrics 至少需要一个指标"]
-    errors = []
-    required = (
-        "metric",
-        "unit",
-        "target",
-        "target_source",
-        "load",
-        "environment",
-        "baseline",
-        "actual",
-        "allowed_variation",
-        "status",
-        "evidence",
-    )
-    for index, metric in enumerate(metrics):
-        if not isinstance(metric, dict):
-            errors.append(f"performance_result.metrics[{index}] 必须是对象")
-            continue
-        for key in required:
-            _require_nonempty(metric.get(key), f"performance_result.metrics[{index}].{key}", errors)
-    return errors
-
-
-def validate_quality_semantics(artifact, stage_status=""):
-    errors = []
-    if stage_status == "PASS" and artifact.get("unresolved_items"):
-        errors.append("quality_result 仍有未解决项，阶段不能通过")
-    outside = (artifact.get("diff_scope") or {}).get("outside") or []
-    if stage_status == "PASS" and outside:
-        errors.append("quality_result 存在超出工作项写入范围的变更")
-    accepted = artifact.get("accepted_risks") or []
-    accepted_ids = [item.get("rule_id") for item in accepted if isinstance(item, dict)]
-    if len(accepted_ids) != len(set(accepted_ids)):
-        errors.append("quality_result.accepted_risks 包含重复规则 ID")
-    accepted_results = {
-        item.get("rule_id") for item in (artifact.get("rule_results") or [])
-        if isinstance(item, dict) and item.get("status") == "ACCEPTED_RISK"
-    }
-    undeclared = sorted(accepted_results - set(accepted_ids))
-    unused = sorted(set(accepted_ids) - accepted_results)
-    if undeclared:
-        errors.append(f"quality_result 缺少逐规则风险接受确认：{', '.join(undeclared)}")
-    if unused:
-        errors.append(f"quality_result.accepted_risks 没有对应的风险接受结果：{', '.join(unused)}")
-    for index, item in enumerate(accepted):
-        if isinstance(item, dict) and len(str(item.get("reason") or "").strip()) < 3:
-            errors.append(f"quality_result.accepted_risks[{index}].reason 必须是具体理由")
-    return errors
-
-
-SEMANTIC_VALIDATORS = {
-    "solution": validate_solution_semantics,
-    "test_plan": validate_test_plan_semantics,
-    "security_result": validate_security_semantics,
-    "performance_result": validate_performance_semantics,
-    "quality_result": validate_quality_semantics,
-}
-
-
-def validate_work_items(items):
-    errors = []
-    if not isinstance(items, list):
-        return ["solution.work_items 必须是数组"]
-    by_id = {}
-    for index, item in enumerate(items):
-        path = f"solution.work_items[{index}]"
-        if not isinstance(item, dict):
-            errors.append(f"{path} 必须是对象")
-            continue
-        unknown = set(item) - WORK_ITEM_INPUT_FIELDS
-        if unknown:
-            errors.append(f"{path} 包含不允许的运行态或未知字段：{', '.join(sorted(unknown))}")
-        for field in WORK_ITEM_INPUT_FIELDS:
-            if field not in item:
-                errors.append(f"{path}.{field} 缺失")
-        item_id = item.get("id")
-        if not isinstance(item_id, str) or not item_id.strip():
-            errors.append(f"{path}.id 必须是非空字符串")
-        elif item_id in by_id:
-            errors.append(f"{path}.id 重复：{item_id}")
-        else:
-            by_id[item_id] = item
-        for field in WORK_ITEM_LIST_FIELDS:
-            value = item.get(field)
-            if not isinstance(value, list) or any(not isinstance(entry, str) or not entry for entry in value):
-                errors.append(f"{path}.{field} 必须是字符串数组")
-        for field in ("title", "owner_agent"):
-            if not isinstance(item.get(field), str) or not item[field].strip():
-                errors.append(f"{path}.{field} 必须是非空字符串")
-    known = set(by_id)
-    for item_id, item in by_id.items():
-        for dependency in item.get("dependencies") or []:
-            if dependency not in known:
-                errors.append(f"工作项 {item_id} 引用了未知依赖：{dependency}")
-            if dependency == item_id:
-                errors.append(f"工作项 {item_id} 不能依赖自身")
-
-    visiting = set()
-    visited = set()
-
-    def visit(item_id):
-        if item_id in visiting:
-            errors.append(f"工作项依赖存在环：{item_id}")
-            return
-        if item_id in visited or item_id not in by_id:
-            return
-        visiting.add(item_id)
-        for dependency in by_id[item_id].get("dependencies") or []:
-            visit(dependency)
-        visiting.remove(item_id)
-        visited.add(item_id)
-
-    for item_id in by_id:
-        visit(item_id)
-    return errors
-
-
-def runtime_work_items(items):
-    errors = validate_work_items(items)
-    if errors:
-        raise ValueError("方案工作项校验失败：\n- " + "\n- ".join(errors))
-    return [
-        {
-            **item,
-            "status": "pending",
-            "evidence": [],
-            "failed_by": "",
-            "return_to": "",
-            "required_changes": [],
-        }
-        for item in items
-    ]
-
-
-def known_work_item_ids(worklist):
-    return {item.get("id") for item in (worklist.get("items") or []) if isinstance(item, dict) and item.get("id")}
-
-
-def validate_work_item_references(worklist, item_ids, extra_ids=None):
-    known = known_work_item_ids(worklist).union(extra_ids or set())
-    unknown = sorted({item_id for item_id in (item_ids or []) if item_id not in known})
-    if unknown:
-        raise ValueError(f"工作项引用不存在：{', '.join(unknown)}")
 
 
 def _artifact_rule_results(artifact):
@@ -704,3 +271,20 @@ def validate_recorded_v2_stage(project, state, stage, result, worklist):
     for raw in result.get("confirmation_evidence") or []:
         resolve_project_file(project, raw, f"阶段 {stage} 的用户确认凭据")
     return prepared
+
+
+# ---- 公共 API re-export：保持 loopx_controller_evidence.* 旧引用不变 ----
+from loopx_controller_evidence_shared import (  # noqa: E402,F401
+    parse_artifact_arguments,
+)
+from loopx_controller_evidence_semantics import (  # noqa: E402,F401
+    validate_performance_semantics,
+    validate_quality_semantics,
+    validate_security_semantics,
+    validate_solution_semantics,
+    validate_test_plan_semantics,
+)
+from loopx_controller_evidence_workitems import (  # noqa: E402,F401
+    known_work_item_ids,
+    validate_work_items,
+)

@@ -43,3 +43,15 @@ jobs:
         run: pip install jsonschema
       - name: 校验 schema 文件与示例产物
         run: python scripts/validate_schemas.py
+
+  release:
+    # tag 推送（vX.Y.Z）时校验 tag 与双 manifest 版本一致；
+    # 普通 push / PR 自动跳过。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 校验发布 tag 与 manifest 版本一致
+        run: python scripts/check_release_version.py
